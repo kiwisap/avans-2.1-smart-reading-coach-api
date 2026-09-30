@@ -21,7 +21,7 @@ export function createTeacherService({
     // Every student specific action goes through this check, so a teacher only ever sees linked students.
     async function assertLinked(teacherId: string, studentId: string): Promise<void> {
         if (!(await userRepository.isLinked(teacherId, studentId))) {
-            throw new HttpError(403, 'This student is not linked to you');
+            throw new HttpError(403, 'Deze leerling is niet aan jou gekoppeld');
         }
     }
 
@@ -36,7 +36,7 @@ export function createTeacherService({
         ): Promise<StudentOverviewDto> {
             await assertLinked(teacherId, studentId);
             const student = await userRepository.findById(studentId);
-            if (!student) throw new HttpError(404, 'Student not found');
+            if (!student) throw new HttpError(404, 'Leerling niet gevonden');
 
             const [profile, readingList] = await Promise.all([
                 profileRepository.findByUserId(studentId),

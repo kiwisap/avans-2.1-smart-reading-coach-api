@@ -28,14 +28,14 @@ export function createProfileService({ profileRepository, bookRepository }: Deps
             const materialTypes = [...new Set(input.materialTypes)];
 
             if (topics.length > MAX_TOPICS) {
-                throw new HttpError(400, `Choose at most ${MAX_TOPICS} topics`);
+                throw new HttpError(400, `Kies maximaal ${MAX_TOPICS} onderwerpen`);
             }
 
             // Topics must exist in the catalog, otherwise advice could never match them.
             const { themes } = await bookRepository.facets();
             const unknown = topics.filter((topic) => !themes.includes(topic));
             if (unknown.length > 0) {
-                throw new HttpError(400, `Unknown topics: ${unknown.join(', ')}`);
+                throw new HttpError(400, `Onbekende onderwerpen: ${unknown.join(', ')}`);
             }
 
             const saved = await profileRepository.upsert(userId, {

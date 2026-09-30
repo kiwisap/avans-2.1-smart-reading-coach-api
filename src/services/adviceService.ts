@@ -33,7 +33,7 @@ export function createAdviceService({ profileRepository, bookRepository }: Deps)
         async getAdvice(userId: string): Promise<SuggestionDto[]> {
             const profile = await profileRepository.findByUserId(userId);
             if (!profile) {
-                throw new HttpError(409, 'Fill in your reading profile first to get advice');
+                throw new HttpError(409, 'Vul eerst je leesprofiel in om advies te krijgen');
             }
 
             const candidates = await findCandidates(profile);

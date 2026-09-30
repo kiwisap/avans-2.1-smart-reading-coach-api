@@ -80,6 +80,6 @@ describe('motivation', () => {
             themes: ['identiteit'],
             description: null,
         });
-        assert.equal(text, 'A poetry collection by A. Dichter about identiteit.');
+        assert.equal(text, 'Een dichtbundel van A. Dichter over identiteit.');
     });
 });

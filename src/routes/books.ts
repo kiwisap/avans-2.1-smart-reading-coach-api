@@ -48,7 +48,7 @@ export default async function bookRoutes(fastify: FastifyInstance): Promise<void
         { schema: idSchema, preHandler },
         async (request) => {
             const book = await bookRepository.findById(request.params.id);
-            if (!book) throw new HttpError(404, 'Book not found');
+            if (!book) throw new HttpError(404, 'Titel niet gevonden');
             return book;
         },
     );
