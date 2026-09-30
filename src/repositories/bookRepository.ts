@@ -8,9 +8,9 @@ const COLLATION = { locale: 'nl', strength: 2 }; // case and accent insensitive 
 
 export interface BookSearch {
     search?: string;
-    type?: string;
-    level?: string;
-    theme?: string;
+    type?: string[];
+    level?: string[];
+    theme?: string[];
     page: number;
     limit: number;
 }
@@ -58,9 +58,9 @@ export function createBookRepository(db: Db) {
 
         async search({ search, type, level, theme, page, limit }: BookSearch) {
             const filter: Record<string, unknown> = {};
-            if (type) filter.type = type;
-            if (level) filter.levels = level;
-            if (theme) filter.themes = theme;
+            if (type?.length) filter.type = { $in: type };
+            if (level?.length) filter.levels = { $in: level };
+            if (theme?.length) filter.themes = { $in: theme };
             if (search) {
                 const pattern = new RegExp(escapeRegex(search), 'i');
                 filter.$or = [

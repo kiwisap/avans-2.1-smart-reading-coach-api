@@ -155,25 +155,25 @@ Elk soort data staat in de opslag die er het beste bij past.
 
 Alle paden beginnen met `/api`.
 
-| Methode en pad                                                      | Wie      | Doel                                                                                              |
-| ------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
-| `POST /auth/register`                                               | iedereen | Account aanmaken (rol leerling)                                                                   |
-| `POST /auth/login`                                                  | iedereen | Inloggen, geeft een token                                                                         |
-| `GET /auth/me`                                                      | ingelogd | Huidige gebruiker                                                                                 |
-| `GET /books`                                                        | ingelogd | Catalogus met zoeken, filters en paginering (`search`, `type`, `level`, `theme`, `page`, `limit`) |
-| `GET /books/filters`                                                | ingelogd | Beschikbare waarden voor de filters                                                               |
-| `GET /books/:id`                                                    | ingelogd | Eén titel                                                                                         |
-| `GET /profile/options`                                              | leerling | Keuzes voor het leesprofiel                                                                       |
-| `GET /profile/me`, `PUT /profile/me`                                | leerling | Eigen leesprofiel lezen en opslaan                                                                |
-| `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie                                                            |
-| `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                          |
-| `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                          |
-| `GET /teachers`                                                     | leerling | Docenten en of je aan ze gekoppeld bent                                                           |
-| `PUT /teachers/:teacherId/link`, `DELETE /teachers/:teacherId/link` | leerling | Koppelen en ontkoppelen                                                                           |
-| `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                             |
-| `GET /students/:studentId`                                          | docent   | Leesprofiel en leeslijst van een gekoppelde leerling                                              |
-| `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                             |
-| `GET /health`                                                       | iedereen | Status van beide databases                                                                        |
+| Methode en pad                                                      | Wie      | Doel                                                                                                                                                         |
+| ------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /auth/register`                                               | iedereen | Account aanmaken (rol leerling)                                                                                                                              |
+| `POST /auth/login`                                                  | iedereen | Inloggen, geeft een token                                                                                                                                    |
+| `GET /auth/me`                                                      | ingelogd | Huidige gebruiker                                                                                                                                            |
+| `GET /books`                                                        | ingelogd | Catalogus met zoeken, filters en paginering (`search`, `type`, `level`, `theme` (elk herhaalbaar, bijvoorbeeld `theme=humor&theme=oorlog`), `page`, `limit`) |
+| `GET /books/filters`                                                | ingelogd | Beschikbare waarden voor de filters                                                                                                                          |
+| `GET /books/:id`                                                    | ingelogd | Eén titel                                                                                                                                                    |
+| `GET /profile/options`                                              | leerling | Keuzes voor het leesprofiel                                                                                                                                  |
+| `GET /profile/me`, `PUT /profile/me`                                | leerling | Eigen leesprofiel lezen en opslaan                                                                                                                           |
+| `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie                                                                                                                       |
+| `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                                                                                     |
+| `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                                                                                     |
+| `GET /teachers`                                                     | leerling | Docenten en of je aan ze gekoppeld bent                                                                                                                      |
+| `PUT /teachers/:teacherId/link`, `DELETE /teachers/:teacherId/link` | leerling | Koppelen en ontkoppelen                                                                                                                                      |
+| `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                                                                                        |
+| `GET /students/:studentId`                                          | docent   | Leesprofiel en leeslijst van een gekoppelde leerling                                                                                                         |
+| `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                                                                                        |
+| `GET /health`                                                       | iedereen | Status van beide databases                                                                                                                                   |
 
 ## Adviesalgoritme
 

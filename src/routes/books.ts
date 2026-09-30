@@ -7,9 +7,15 @@ const listSchema = {
         type: 'object',
         properties: {
             search: { type: 'string', maxLength: 100 },
-            type: { type: 'string', maxLength: 30 },
-            level: { type: 'string', enum: ['2F', '3F', '3F+'] },
-            theme: { type: 'string', maxLength: 60 },
+            // type, level and theme are repeatable (?theme=a&theme=b): a book matches when it
+            // fits at least one value per filter, and all filters have to match.
+            type: { type: 'array', items: { type: 'string', maxLength: 30 }, maxItems: 10 },
+            level: {
+                type: 'array',
+                items: { type: 'string', enum: ['2F', '3F', '3F+'] },
+                maxItems: 3,
+            },
+            theme: { type: 'array', items: { type: 'string', maxLength: 60 }, maxItems: 10 },
             page: { type: 'integer', minimum: 1, default: 1 },
             limit: { type: 'integer', minimum: 1, maximum: 50, default: 12 },
         },
