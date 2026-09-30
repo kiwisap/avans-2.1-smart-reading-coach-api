@@ -1,17 +1,18 @@
 import { and, eq } from 'drizzle-orm';
-import { readingListItems, type ReadingListRow } from '../db/schema.js';
+import { readingListItems } from '../db/schema.js';
+import type { ReadingListItem } from '../entities/readingListItem.js';
 import type { Database } from '../db/types.js';
 import type { ReadingStatus } from '../readingList/statuses.js';
 
 // Every query filters on userId, so a student can never touch someone else's list.
 export function createReadingListRepository(db: Database) {
     return {
-        async listByUser(userId: string): Promise<ReadingListRow[]> {
+        async listByUser(userId: string): Promise<ReadingListItem[]> {
             return db.select().from(readingListItems).where(eq(readingListItems.userId, userId));
         },
 
         // Returns null when the book is already on the list.
-        async create(userId: string, bookId: string): Promise<ReadingListRow | null> {
+        async create(userId: string, bookId: string): Promise<ReadingListItem | null> {
             const [item] = await db
                 .insert(readingListItems)
                 .values({ userId, bookId })
@@ -24,7 +25,7 @@ export function createReadingListRepository(db: Database) {
             userId: string,
             id: string,
             status: ReadingStatus,
-        ): Promise<ReadingListRow | null> {
+        ): Promise<ReadingListItem | null> {
             const [item] = await db
                 .update(readingListItems)
                 .set({ status, readAt: status === 'read' ? new Date() : null })

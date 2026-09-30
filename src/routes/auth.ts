@@ -1,13 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import type { LoginDto } from '../dto/loginDto.js';
+import type { RegisterDto } from '../dto/registerDto.js';
+import type { UserDto } from '../dto/userDto.js';
 import { HttpError } from '../errors.js';
 import { createUserRepository } from '../repositories/userRepository.js';
-import {
-    createAuthService,
-    toPublicUser,
-    type LoginInput,
-    type PublicUser,
-    type RegisterInput,
-} from '../services/authService.js';
+import { createAuthService } from '../services/authService.js';
+import { toUserDto } from '../services/mappingService.js';
 
 const credentials = {
     email: { type: 'string', format: 'email', maxLength: 254 },
@@ -42,10 +40,10 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
     const userRepository = createUserRepository(fastify.db);
     const authService = createAuthService({ userRepository });
 
-    const issueToken = (user: PublicUser): string =>
+    const issueToken = (user: UserDto): string =>
         fastify.jwt.sign({ sub: user.id, role: user.role });
 
-    fastify.post<{ Body: RegisterInput }>(
+    fastify.post<{ Body: RegisterDto }>(
         '/auth/register',
         { schema: registerSchema },
         async (request, reply) => {
@@ -54,7 +52,7 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
         },
     );
 
-    fastify.post<{ Body: LoginInput }>('/auth/login', { schema: loginSchema }, async (request) => {
+    fastify.post<{ Body: LoginDto }>('/auth/login', { schema: loginSchema }, async (request) => {
         const user = await authService.login(request.body);
         return { token: issueToken(user), user };
     });
@@ -62,6 +60,6 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
     fastify.get('/auth/me', { preHandler: fastify.authenticate }, async (request) => {
         const user = await userRepository.findById(request.user.sub);
         if (!user) throw new HttpError(401, 'Account no longer exists');
-        return { user: toPublicUser(user) };
+        return { user: toUserDto(user) };
     });
 }

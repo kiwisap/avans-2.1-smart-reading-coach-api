@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { Book } from '../src/catalog/types.js';
-import type { ReadingProfileRow } from '../src/db/schema.js';
+import type { BookDto } from '../src/dto/bookDto.js';
+import type { ReadingProfile } from '../src/entities/readingProfile.js';
 import type { CandidateQuery } from '../src/repositories/bookRepository.js';
 import { createAdviceService } from '../src/services/adviceService.js';
 
-const makeBook = (id: string, title: string, levels: Book['levels'], themes: string[]): Book => ({
+const makeBook = (
+    id: string,
+    title: string,
+    levels: BookDto['levels'],
+    themes: string[],
+): BookDto => ({
     id,
     title,
     author: null,
@@ -19,14 +24,14 @@ const makeBook = (id: string, title: string, levels: Book['levels'], themes: str
     url: null,
 });
 
-const catalog: Book[] = [
+const catalog: BookDto[] = [
     makeBook('1', 'Liefdesboek', ['2F'], ['liefde']),
     makeBook('2', 'Oorlogsboek', ['2F'], ['oorlog']),
     makeBook('3', 'Humorboek', ['2F'], ['humor']),
     makeBook('4', 'Moeilijk boek', ['3F+'], ['liefde']),
 ];
 
-function makeProfile(overrides: Partial<ReadingProfileRow> = {}): ReadingProfileRow {
+function makeProfile(overrides: Partial<ReadingProfile> = {}): ReadingProfile {
     return {
         userId: 'u1',
         languageLevel: '2F',
@@ -40,7 +45,7 @@ function makeProfile(overrides: Partial<ReadingProfileRow> = {}): ReadingProfile
     };
 }
 
-function setup(profile: ReadingProfileRow | null) {
+function setup(profile: ReadingProfile | null) {
     const bookRepository = {
         findCandidates: async ({ allowedLevels, topics, materialTypes }: CandidateQuery) =>
             catalog.filter(

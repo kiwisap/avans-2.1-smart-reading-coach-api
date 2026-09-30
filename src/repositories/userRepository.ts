@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { readingProfiles, teacherStudents, users, type User } from '../db/schema.js';
+import { readingProfiles, teacherStudents, users } from '../db/schema.js';
+import type { User } from '../entities/user.js';
 import type { Database } from '../db/types.js';
 import type { UserRole } from '../auth/roles.js';
 

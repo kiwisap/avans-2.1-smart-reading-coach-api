@@ -68,6 +68,4 @@ export const readingListItems = pgTable(
     (table) => [unique('reading_list_user_book').on(table.userId, table.bookId)],
 );
 
-export type User = typeof users.$inferSelect;
 export type ReadingProfileRow = typeof readingProfiles.$inferSelect;
-export type ReadingListRow = typeof readingListItems.$inferSelect;

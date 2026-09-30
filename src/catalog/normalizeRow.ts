@@ -6,7 +6,7 @@ import {
     type LanguageLevel,
     type MaterialType,
 } from '../profile/profileOptions.js';
-import type { CatalogItem } from './types.js';
+import type { Book } from '../entities/book.js';
 
 interface TypeMapping {
     type: MaterialType;
@@ -90,7 +90,7 @@ export function buildKey(item: {
 
 // row: [title, author, column3, (unused), type, level, column7]
 // Returns null for empty rows, otherwise { doc, warnings }.
-export function normalizeRow(row: string[]): { doc: CatalogItem; warnings: string[] } | null {
+export function normalizeRow(row: string[]): { doc: Book; warnings: string[] } | null {
     const [rawTitle, rawAuthor, column3, , rawType, rawLevel, column7] = row;
     const title = clean(rawTitle);
     if (!title) return null;
@@ -111,7 +111,7 @@ export function normalizeRow(row: string[]): { doc: CatalogItem; warnings: strin
     const themesInDescription = THEMES_IN_DESCRIPTION_COLUMN.has(mapped.type);
     const author = clean(rawAuthor) || null;
 
-    const doc: CatalogItem = {
+    const doc: Book = {
         key: buildKey({ title, author, type: mapped.type }),
         title,
         author,

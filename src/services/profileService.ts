@@ -1,5 +1,5 @@
 import { HttpError } from '../errors.js';
-import type { ReadingProfileRow } from '../db/schema.js';
+import type { ProfileDto } from '../dto/profileDto.js';
 import {
     DESIRED_LENGTHS,
     LANGUAGE_LEVELS,
@@ -10,22 +10,7 @@ import {
 } from '../profile/profileOptions.js';
 import type { BookRepository } from '../repositories/bookRepository.js';
 import type { ProfileRepository } from '../repositories/profileRepository.js';
-
-export interface ProfileDto extends ProfileData {
-    updatedAt: Date;
-}
-
-export function toProfileDto(profile: ReadingProfileRow | null): ProfileDto | null {
-    if (!profile) return null;
-    return {
-        languageLevel: profile.languageLevel,
-        materialTypes: profile.materialTypes,
-        topics: profile.topics,
-        desiredLength: profile.desiredLength,
-        readingGoal: profile.readingGoal,
-        updatedAt: profile.updatedAt,
-    };
-}
+import { toProfileDto } from './mappingService.js';
 
 interface Deps {
     profileRepository: Pick<ProfileRepository, 'findByUserId' | 'upsert'>;

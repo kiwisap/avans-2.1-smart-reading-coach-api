@@ -1,4 +1,4 @@
-import type { Book } from '../catalog/types.js';
+import type { BookDto } from '../dto/bookDto.js';
 import type { ProfileData, ReadingGoal } from '../profile/profileOptions.js';
 import type { MatchReasons } from './scoring.js';
 
@@ -21,7 +21,7 @@ const GOAL_TEXT: Record<ReadingGoal, string> = {
 // "Why this fits you": built only from the reasons that actually matched.
 export function buildMotivation(
     profile: ProfileData,
-    book: Pick<Book, 'type'>,
+    book: Pick<BookDto, 'type'>,
     reasons: MatchReasons,
 ): string {
     const parts: string[] = [];
@@ -49,7 +49,7 @@ export function buildMotivation(
 
 // Not every catalog item has a description (articles and poetry only have themes).
 export function describeBook(
-    book: Pick<Book, 'type' | 'author' | 'themes' | 'description'>,
+    book: Pick<BookDto, 'type' | 'author' | 'themes' | 'description'>,
 ): string {
     if (book.description) return book.description;
     const kind = TYPE_NAMES[book.type] ?? 'text';

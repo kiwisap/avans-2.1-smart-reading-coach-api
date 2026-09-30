@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { ReadingProfileRow, User } from '../src/db/schema.js';
+import type { ReadingProfile } from '../src/entities/readingProfile.js';
+import type { User } from '../src/entities/user.js';
 import { createTeacherLinkService } from '../src/services/teacherLinkService.js';
 import { createTeacherService } from '../src/services/teacherService.js';
 
@@ -19,7 +20,7 @@ const users: Record<string, User> = {
     s1: makeUser('s1', 'Student', 'student'),
 };
 
-const profile: ReadingProfileRow = {
+const profile: ReadingProfile = {
     userId: 's1',
     languageLevel: '2F',
     materialTypes: [],

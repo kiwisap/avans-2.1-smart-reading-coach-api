@@ -1,14 +1,10 @@
-import { ObjectId, type Db, type Filter, type WithId } from 'mongodb';
-import type { Book, CatalogItem } from '../catalog/types.js';
+import { ObjectId, type Db, type Filter } from 'mongodb';
+import type { BookDto } from '../dto/bookDto.js';
+import type { Book } from '../entities/book.js';
+import { toBookDto } from '../services/mappingService.js';
 import type { LanguageLevel } from '../profile/profileOptions.js';
 
 const COLLATION = { locale: 'nl', strength: 2 }; // case and accent insensitive Dutch ordering
-
-// What is really stored in MongoDB: the catalog item plus timestamps.
-interface StoredBook extends CatalogItem {
-    createdAt?: Date;
-    updatedAt?: Date;
-}
 
 export interface BookSearch {
     search?: string;
@@ -29,16 +25,11 @@ function escapeRegex(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function toDto(doc: WithId<StoredBook>): Book {
-    const { _id, key: _key, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = doc;
-    return { id: _id.toString(), ...rest };
-}
-
 const usable = (values: unknown[]): string[] =>
     values.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
 
 export function createBookRepository(db: Db) {
-    const books = db.collection<StoredBook>('books');
+    const books = db.collection<Book>('books');
 
     return {
         async ensureIndexes(): Promise<void> {
@@ -52,7 +43,7 @@ export function createBookRepository(db: Db) {
         },
 
         // Idempotent: running the import twice updates existing items instead of duplicating them.
-        async upsertMany(docs: CatalogItem[]): Promise<{ inserted: number; updated: number }> {
+        async upsertMany(docs: Book[]): Promise<{ inserted: number; updated: number }> {
             const now = new Date();
             const operations = docs.map((doc) => ({
                 updateOne: {
@@ -79,7 +70,7 @@ export function createBookRepository(db: Db) {
                     { themes: pattern },
                 ];
             }
-            const query = filter as Filter<StoredBook>;
+            const query = filter as Filter<Book>;
 
             const [total, docs] = await Promise.all([
                 books.countDocuments(query),
@@ -91,7 +82,7 @@ export function createBookRepository(db: Db) {
                     .limit(limit)
                     .toArray(),
             ]);
-            return { items: docs.map(toDto), total };
+            return { items: docs.map(toBookDto), total };
         },
 
         // Narrow query for the advice: only books at an allowed level, optionally limited to matching topics or types.
@@ -99,7 +90,7 @@ export function createBookRepository(db: Db) {
             allowedLevels,
             topics,
             materialTypes,
-        }: CandidateQuery): Promise<Book[]> {
+        }: CandidateQuery): Promise<BookDto[]> {
             const conditions: Record<string, unknown>[] = [
                 { $or: [{ levels: { $in: allowedLevels } }, { levels: { $size: 0 } }] },
             ];
@@ -111,23 +102,23 @@ export function createBookRepository(db: Db) {
                     ],
                 });
             }
-            const docs = await books.find({ $and: conditions } as Filter<StoredBook>).toArray();
-            return docs.map(toDto);
+            const docs = await books.find({ $and: conditions } as Filter<Book>).toArray();
+            return docs.map(toBookDto);
         },
 
-        async findByIds(ids: string[]): Promise<Book[]> {
+        async findByIds(ids: string[]): Promise<BookDto[]> {
             const objectIds = ids
                 .filter((id) => ObjectId.isValid(id))
                 .map((id) => new ObjectId(id));
             if (objectIds.length === 0) return [];
             const docs = await books.find({ _id: { $in: objectIds } }).toArray();
-            return docs.map(toDto);
+            return docs.map(toBookDto);
         },
 
-        async findById(id: string): Promise<Book | null> {
+        async findById(id: string): Promise<BookDto | null> {
             if (!ObjectId.isValid(id)) return null;
             const doc = await books.findOne({ _id: new ObjectId(id) });
-            return doc ? toDto(doc) : null;
+            return doc ? toBookDto(doc) : null;
         },
 
         // Values for the filter dropdowns.

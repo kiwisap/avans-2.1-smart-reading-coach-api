@@ -1,7 +1,8 @@
 import { HttpError } from '../errors.js';
 import { buildMotivation, describeBook } from '../advice/motivation.js';
 import { allowedLevels, scoreBook } from '../advice/scoring.js';
-import type { Book } from '../catalog/types.js';
+import type { BookDto } from '../dto/bookDto.js';
+import type { SuggestionDto } from '../dto/suggestionDto.js';
 import type { ProfileData } from '../profile/profileOptions.js';
 import type { BookRepository } from '../repositories/bookRepository.js';
 import type { ProfileRepository } from '../repositories/profileRepository.js';
@@ -9,15 +10,13 @@ import type { ProfileRepository } from '../repositories/profileRepository.js';
 export const MIN_SUGGESTIONS = 3;
 export const MAX_SUGGESTIONS = 5;
 
-export type Suggestion = Book & { motivation: string };
-
 interface Deps {
     profileRepository: Pick<ProfileRepository, 'findByUserId'>;
     bookRepository: Pick<BookRepository, 'findCandidates'>;
 }
 
 export function createAdviceService({ profileRepository, bookRepository }: Deps) {
-    async function findCandidates(profile: ProfileData): Promise<Book[]> {
+    async function findCandidates(profile: ProfileData): Promise<BookDto[]> {
         const levels = allowedLevels(profile.languageLevel);
         const matching = await bookRepository.findCandidates({
             allowedLevels: levels,
@@ -31,7 +30,7 @@ export function createAdviceService({ profileRepository, bookRepository }: Deps)
     }
 
     return {
-        async getAdvice(userId: string): Promise<Suggestion[]> {
+        async getAdvice(userId: string): Promise<SuggestionDto[]> {
             const profile = await profileRepository.findByUserId(userId);
             if (!profile) {
                 throw new HttpError(409, 'Fill in your reading profile first to get advice');

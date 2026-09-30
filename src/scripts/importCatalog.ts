@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb';
 import { normalizeRow } from '../catalog/normalizeRow.js';
 import { readCatalogSheet } from '../catalog/readCatalogSheet.js';
-import type { CatalogItem } from '../catalog/types.js';
+import type { Book } from '../entities/book.js';
 import { createBookRepository } from '../repositories/bookRepository.js';
 
 const filePath = process.argv[2] ?? 'data/leescatalogus.xlsx';
@@ -10,7 +10,7 @@ if (!mongoUrl) throw new Error('MONGO_URL is not set');
 
 const rows = await readCatalogSheet(filePath);
 
-const docsByKey = new Map<string, CatalogItem>();
+const docsByKey = new Map<string, Book>();
 const duplicates: string[] = [];
 const warnings: string[] = [];
 

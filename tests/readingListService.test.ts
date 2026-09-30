@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { Book } from '../src/catalog/types.js';
-import type { ReadingListRow } from '../src/db/schema.js';
+import type { BookDto } from '../src/dto/bookDto.js';
+import type { ReadingListItem } from '../src/entities/readingListItem.js';
 import type { ReadingStatus } from '../src/readingList/statuses.js';
 import { createReadingListService } from '../src/services/readingListService.js';
 
-const makeBook = (id: string, title: string): Book => ({
+const makeBook = (id: string, title: string): BookDto => ({
     id,
     title,
     author: null,
@@ -19,12 +19,12 @@ const makeBook = (id: string, title: string): Book => ({
     url: null,
 });
 
-const books: Record<string, Book> = {
+const books: Record<string, BookDto> = {
     b1: makeBook('b1', 'Boek 1'),
     b2: makeBook('b2', 'Boek 2'),
 };
 
-const item = (overrides: Partial<ReadingListRow> = {}): ReadingListRow => ({
+const item = (overrides: Partial<ReadingListItem> = {}): ReadingListItem => ({
     id: 'x',
     userId: 'u1',
     bookId: 'b1',
@@ -34,7 +34,7 @@ const item = (overrides: Partial<ReadingListRow> = {}): ReadingListRow => ({
     ...overrides,
 });
 
-function setup(initialItems: ReadingListRow[] = []) {
+function setup(initialItems: ReadingListItem[] = []) {
     const items = [...initialItems];
     const readingListRepository = {
         listByUser: async (userId: string) => items.filter((i) => i.userId === userId),

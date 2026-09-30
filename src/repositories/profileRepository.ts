@@ -1,11 +1,12 @@
 import { eq } from 'drizzle-orm';
-import { readingProfiles, type ReadingProfileRow } from '../db/schema.js';
+import { readingProfiles } from '../db/schema.js';
+import type { ReadingProfile } from '../entities/readingProfile.js';
 import type { Database } from '../db/types.js';
 import type { ProfileData } from '../profile/profileOptions.js';
 
 export function createProfileRepository(db: Database) {
     return {
-        async findByUserId(userId: string): Promise<ReadingProfileRow | null> {
+        async findByUserId(userId: string): Promise<ReadingProfile | null> {
             const [profile] = await db
                 .select()
                 .from(readingProfiles)
@@ -15,7 +16,7 @@ export function createProfileRepository(db: Database) {
         },
 
         // Insert on first save, update afterwards.
-        async upsert(userId: string, data: ProfileData): Promise<ReadingProfileRow> {
+        async upsert(userId: string, data: ProfileData): Promise<ReadingProfile> {
             const [profile] = await db
                 .insert(readingProfiles)
                 .values({ userId, ...data })

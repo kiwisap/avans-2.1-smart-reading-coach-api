@@ -1,7 +1,7 @@
 import type { LanguageLevel, MaterialType } from '../profile/profileOptions.js';
 
 // One catalog item as it is stored in MongoDB (before Mongo adds _id).
-export interface CatalogItem {
+export interface Book {
     key: string; // normalized title, author and type, used to avoid duplicates on import
     title: string;
     author: string | null;
@@ -13,7 +13,6 @@ export interface CatalogItem {
     levels: LanguageLevel[];
     levelLabel: string | null;
     url: string | null;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
-
-// A catalog item as the API returns it.
-export type Book = Omit<CatalogItem, 'key'> & { id: string };

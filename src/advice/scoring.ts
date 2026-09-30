@@ -1,4 +1,4 @@
-import type { Book } from '../catalog/types.js';
+import type { BookDto } from '../dto/bookDto.js';
 import {
     LANGUAGE_LEVELS,
     type DesiredLength,
@@ -49,7 +49,7 @@ export interface ScoreResult {
 }
 
 // The part of a book the scoring needs.
-export type ScorableBook = Pick<Book, 'levels' | 'themes' | 'type'>;
+export type ScorableBook = Pick<BookDto, 'levels' | 'themes' | 'type'>;
 
 const rank = (level: LanguageLevel): number => LANGUAGE_LEVELS.indexOf(level);
 

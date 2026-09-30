@@ -1,15 +1,10 @@
 import { HttpError } from '../errors.js';
-import type { PublicUser } from './authService.js';
-import { toProfileDto, type ProfileDto } from './profileService.js';
-import type { ReadingListItemDto, ReadingListService } from './readingListService.js';
+import type { ReadingListItemDto } from '../dto/readingListItemDto.js';
+import type { StudentOverviewDto } from '../dto/studentOverviewDto.js';
+import { toProfileDto } from './mappingService.js';
+import type { ReadingListService } from './readingListService.js';
 import type { ProfileRepository } from '../repositories/profileRepository.js';
 import type { UserRepository } from '../repositories/userRepository.js';
-
-export interface StudentOverview {
-    student: Pick<PublicUser, 'id' | 'name' | 'email'>;
-    profile: ProfileDto | null;
-    readingList: ReadingListItemDto[];
-}
 
 interface Deps {
     userRepository: Pick<UserRepository, 'isLinked' | 'findById' | 'findStudentsOfTeacher'>;
@@ -35,7 +30,10 @@ export function createTeacherService({
             return userRepository.findStudentsOfTeacher(teacherId);
         },
 
-        async getStudentOverview(teacherId: string, studentId: string): Promise<StudentOverview> {
+        async getStudentOverview(
+            teacherId: string,
+            studentId: string,
+        ): Promise<StudentOverviewDto> {
             await assertLinked(teacherId, studentId);
             const student = await userRepository.findById(studentId);
             if (!student) throw new HttpError(404, 'Student not found');
