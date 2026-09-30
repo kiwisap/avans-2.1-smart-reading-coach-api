@@ -1,0 +1,31 @@
+{
+    "compilerOptions": {
+        /* Language and environment */
+        "target": "ES2023",
+        "lib": ["ES2023"],
+        "types": ["node"],
+
+        /* Modules: Node.js ESM. Relative imports must end in .js, also for .ts files. */
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "verbatimModuleSyntax": true,
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "skipLibCheck": true,
+
+        /* Type checking */
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+
+        /* This file only type checks. tsconfig.build.json creates the dist folder. */
+        "noEmit": true
+    },
+    "include": ["src", "tests", "drizzle.config.ts"],
+    "exclude": ["node_modules", "dist"]
+}

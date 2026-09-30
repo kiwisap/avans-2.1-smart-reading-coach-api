@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790687573692,
+      "tag": "0000_wooden_thunderball",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790688501344,
+      "tag": "0001_curly_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790689156190,
+      "tag": "0002_striped_lady_vermin",
+      "breakpoints": true
+    }
+  ]
+}

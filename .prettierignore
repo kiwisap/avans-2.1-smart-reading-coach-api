@@ -1,0 +1,7 @@
+dist
+node_modules
+drizzle
+_to_delete
+data
+package-lock.json
+.env
