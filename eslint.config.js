@@ -23,6 +23,8 @@ export default defineConfig([
             'prefer-const': 'error',
             'no-console': ['warn', { allow: ['warn', 'error'] }],
             '@typescript-eslint/consistent-type-imports': 'error',
+            // Fails the lint when code uses an API that is marked @deprecated.
+            '@typescript-eslint/no-deprecated': 'error',
             '@typescript-eslint/no-unused-vars': [
                 'error',
                 { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
