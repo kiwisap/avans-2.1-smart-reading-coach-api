@@ -13,8 +13,7 @@ type LinkDeps = {
 export function createTeacherLinkService({ userRepository }: LinkDeps) {
     async function requireTeacher(teacherId: string) {
         const teacher = await userRepository.findById(teacherId);
-        if (!teacher || teacher.role !== 'teacher')
-            throw new HttpError(404, 'Docent niet gevonden');
+        if (!teacher || teacher.role !== 'teacher') throw new HttpError(404, 'teachers.notFound');
         return teacher;
     }
 

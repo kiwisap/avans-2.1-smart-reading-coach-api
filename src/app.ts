@@ -5,6 +5,7 @@ import postgres from './plugins/postgres.js';
 import mongo from './plugins/mongo.js';
 import auth from './plugins/auth.js';
 import errorHandler from './plugins/errorHandler.js';
+import locale from './plugins/locale.js';
 import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
 import studentRoutes from './routes/students.js';
@@ -21,6 +22,7 @@ export async function buildApp(): Promise<FastifyInstance> {
         origin: config.corsOrigin,
         methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     });
+    await app.register(locale);
     await app.register(errorHandler);
     await app.register(postgres, { connectionString: config.postgresUrl });
     await app.register(mongo, { url: config.mongoUrl, dbName: config.mongoDb });

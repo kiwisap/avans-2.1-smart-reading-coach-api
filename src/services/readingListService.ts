@@ -28,10 +28,10 @@ export function createReadingListService({ readingListRepository, bookRepository
 
         async add(userId: string, bookId: string): Promise<ReadingListItemDto> {
             const book = await bookRepository.findById(bookId);
-            if (!book) throw new HttpError(404, 'Deze titel staat niet in de catalogus');
+            if (!book) throw new HttpError(404, 'readingList.bookNotInCatalog');
 
             const item = await readingListRepository.create(userId, bookId);
-            if (!item) throw new HttpError(409, 'Deze titel staat al op je leeslijst');
+            if (!item) throw new HttpError(409, 'readingList.alreadyOnList');
             return toReadingListItemDto(item, book);
         },
 
@@ -41,14 +41,14 @@ export function createReadingListService({ readingListRepository, bookRepository
             status: ReadingStatus,
         ): Promise<ReadingListItemDto> {
             const item = await readingListRepository.updateStatus(userId, id, status);
-            if (!item) throw new HttpError(404, 'Leeslijstitem niet gevonden');
+            if (!item) throw new HttpError(404, 'readingList.itemNotFound');
             const book = await bookRepository.findById(item.bookId);
             return toReadingListItemDto(item, book);
         },
 
         async remove(userId: string, id: string): Promise<void> {
             const removed = await readingListRepository.remove(userId, id);
-            if (!removed) throw new HttpError(404, 'Leeslijstitem niet gevonden');
+            if (!removed) throw new HttpError(404, 'readingList.itemNotFound');
         },
     };
 }

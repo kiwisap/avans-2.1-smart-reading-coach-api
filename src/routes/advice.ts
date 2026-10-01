@@ -11,6 +11,6 @@ export default async function adviceRoutes(fastify: FastifyInstance): Promise<vo
 
     // Advice is based on the saved reading profile of the logged in student.
     fastify.get('/advice', { preHandler: fastify.authorize('student') }, async (request) => ({
-        suggestions: await adviceService.getAdvice(request.user.sub),
+        suggestions: await adviceService.getAdvice(request.user.sub, request.locale),
     }));
 }

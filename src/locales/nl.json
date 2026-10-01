@@ -1,0 +1,95 @@
+{
+    "errors": {
+        "generic": {
+            "badRequest": "Het verzoek is ongeldig",
+            "notFound": "Pagina niet gevonden",
+            "server": "Er is iets misgegaan op de server. Probeer het later opnieuw."
+        },
+        "validation": {
+            "required": "Het veld {{field}} is verplicht",
+            "invalidEmail": "Vul een geldig e-mailadres in",
+            "invalidFormat": "Het veld {{field}} heeft een ongeldig formaat",
+            "passwordTooShort": "Het wachtwoord moet minimaal {{min}} tekens lang zijn",
+            "empty": "Het veld {{field}} is niet ingevuld",
+            "tooLong": "Het veld {{field}} is te lang",
+            "invalid": "Het veld {{field}} is ongeldig"
+        },
+        "auth": {
+            "notLoggedIn": "Je bent niet ingelogd of je sessie is verlopen",
+            "forbidden": "Je hebt geen toegang tot deze pagina",
+            "accountGone": "Dit account bestaat niet meer",
+            "emailTaken": "Er bestaat al een account met dit e-mailadres",
+            "invalidCredentials": "Onjuist e-mailadres of wachtwoord"
+        },
+        "books": {
+            "notFound": "Titel niet gevonden"
+        },
+        "advice": {
+            "profileRequired": "Vul eerst je leesprofiel in om advies te krijgen"
+        },
+        "profile": {
+            "tooManyTopics": "Kies maximaal {{max}} onderwerpen",
+            "unknownTopics": "Onbekende onderwerpen: {{topics}}"
+        },
+        "readingList": {
+            "bookNotInCatalog": "Deze titel staat niet in de catalogus",
+            "alreadyOnList": "Deze titel staat al op je leeslijst",
+            "itemNotFound": "Leeslijstitem niet gevonden"
+        },
+        "teachers": {
+            "notFound": "Docent niet gevonden"
+        },
+        "students": {
+            "notLinked": "Deze leerling is niet aan jou gekoppeld",
+            "notFound": "Leerling niet gevonden"
+        }
+    },
+    "fields": {
+        "email": "e-mailadres",
+        "password": "wachtwoord",
+        "name": "naam",
+        "languageLevel": "leesniveau",
+        "materialTypes": "soorten teksten",
+        "topics": "onderwerpen",
+        "desiredLength": "lengte",
+        "readingGoal": "reden om te lezen",
+        "bookId": "titel",
+        "status": "status",
+        "input": "invoer"
+    },
+    "advice": {
+        "types": {
+            "boek": "boek",
+            "online-artikel": "online artikel",
+            "blogpost": "blogpost",
+            "dichtbundel": "dichtbundel",
+            "tijdschrift": "tijdschrift",
+            "krant": "krant"
+        },
+        "lengths": {
+            "short": "korte",
+            "medium": "middellange",
+            "long": "lange"
+        },
+        "goals": {
+            "enjoyment": "Een goede keuze om voor je plezier te lezen.",
+            "learn": "Een goede keuze om iets nieuws te leren.",
+            "language": "Een goede keuze om je taalvaardigheid te oefenen.",
+            "work": "Handig voor werk of studie."
+        },
+        "motivation": {
+            "topics": "Het gaat over je onderwerpen: {{topics}}.",
+            "levelExact": "Het is geschreven op jouw leesniveau ({{level}}).",
+            "levelEasier": "Het is iets makkelijker dan jouw niveau ({{level}}), dus het leest lekker weg.",
+            "materialType": "Het is een {{type}}, een van de soorten teksten die je leuk vindt.",
+            "length": "De lengte past bij je wens voor een {{length}} tekst.",
+            "fallback": "Een goede keuze op jouw leesniveau."
+        },
+        "description": {
+            "kindFallback": "tekst",
+            "by": " van {{author}}",
+            "about": " over {{themes}}",
+            "sentence": "Een {{kind}}{{by}}{{about}}."
+        }
+    }
+}

@@ -1,8 +1,8 @@
 import type { GridFSBucket, Db, MongoClient } from 'mongodb';
-import type { FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import type { UserRole } from '../auth/roles.js';
 import type { Database } from '../db/types.js';
+import type { Locale } from '../i18n.js';
 
 // Teach TypeScript about the things our plugins add to Fastify.
 declare module 'fastify' {
@@ -12,6 +12,9 @@ declare module 'fastify' {
         mongo: { client: MongoClient; db: Db; files: GridFSBucket };
         authenticate: (request: FastifyRequest) => Promise<void>;
         authorize: (...roles: UserRole[]) => (request: FastifyRequest) => Promise<void>;
+    }
+    interface FastifyRequest {
+        locale: Locale;
     }
 }
 

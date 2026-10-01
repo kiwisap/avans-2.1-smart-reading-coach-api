@@ -59,7 +59,7 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
 
     fastify.get('/auth/me', { preHandler: fastify.authenticate }, async (request) => {
         const user = await userRepository.findById(request.user.sub);
-        if (!user) throw new HttpError(401, 'Dit account bestaat niet meer');
+        if (!user) throw new HttpError(401, 'auth.accountGone');
         return { user: toUserDto(user) };
     });
 }

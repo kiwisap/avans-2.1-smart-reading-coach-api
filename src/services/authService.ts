@@ -21,7 +21,7 @@ export function createAuthService({ userRepository }: { userRepository: UserRepo
             const normalizedEmail = email.trim().toLowerCase();
 
             if (await userRepository.findByEmail(normalizedEmail)) {
-                throw new HttpError(409, 'Er bestaat al een account met dit e-mailadres');
+                throw new HttpError(409, 'auth.emailTaken');
             }
 
             const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -35,7 +35,7 @@ export function createAuthService({ userRepository }: { userRepository: UserRepo
                 return toUserDto(user);
             } catch (err) {
                 if (isUniqueViolation(err)) {
-                    throw new HttpError(409, 'Er bestaat al een account met dit e-mailadres');
+                    throw new HttpError(409, 'auth.emailTaken');
                 }
                 throw err;
             }
@@ -47,7 +47,7 @@ export function createAuthService({ userRepository }: { userRepository: UserRepo
 
             // Same message for unknown email and wrong password, so accounts cannot be probed.
             if (!user || !valid) {
-                throw new HttpError(401, 'Onjuist e-mailadres of wachtwoord');
+                throw new HttpError(401, 'auth.invalidCredentials');
             }
             return toUserDto(user);
         },

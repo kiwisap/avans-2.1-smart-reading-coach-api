@@ -1,4 +1,5 @@
 import { HttpError } from '../errors.js';
+import { DEFAULT_LOCALE, type Locale } from '../i18n.js';
 import { buildMotivation, describeBook } from '../advice/motivation.js';
 import { allowedLevels, scoreBook } from '../advice/scoring.js';
 import type { BookDto } from '../dto/bookDto.js';
@@ -30,10 +31,10 @@ export function createAdviceService({ profileRepository, bookRepository }: Deps)
     }
 
     return {
-        async getAdvice(userId: string): Promise<SuggestionDto[]> {
+        async getAdvice(userId: string, locale: Locale = DEFAULT_LOCALE): Promise<SuggestionDto[]> {
             const profile = await profileRepository.findByUserId(userId);
             if (!profile) {
-                throw new HttpError(409, 'Vul eerst je leesprofiel in om advies te krijgen');
+                throw new HttpError(409, 'advice.profileRequired');
             }
 
             const candidates = await findCandidates(profile);
@@ -52,8 +53,8 @@ export function createAdviceService({ profileRepository, bookRepository }: Deps)
                 .slice(0, MAX_SUGGESTIONS)
                 .map(({ book, result }) => ({
                     ...book,
-                    description: describeBook(book),
-                    motivation: buildMotivation(profile, book, result.reasons),
+                    description: describeBook(book, locale),
+                    motivation: buildMotivation(profile, book, result.reasons, locale),
                 }));
         },
     };

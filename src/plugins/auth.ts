@@ -15,7 +15,7 @@ export default fp<{ secret: string; expiresIn: string }>(async (fastify, opts) =
         try {
             await request.jwtVerify();
         } catch {
-            throw new HttpError(401, 'Je bent niet ingelogd of je sessie is verlopen');
+            throw new HttpError(401, 'auth.notLoggedIn');
         }
     });
 
@@ -26,7 +26,7 @@ export default fp<{ secret: string; expiresIn: string }>(async (fastify, opts) =
             async (request: FastifyRequest): Promise<void> => {
                 await fastify.authenticate(request);
                 if (!roles.includes(request.user.role)) {
-                    throw new HttpError(403, 'Je hebt geen toegang tot deze pagina');
+                    throw new HttpError(403, 'auth.forbidden');
                 }
             },
     );

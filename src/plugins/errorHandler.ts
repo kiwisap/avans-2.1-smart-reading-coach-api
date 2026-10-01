@@ -1,19 +1,34 @@
+import { STATUS_CODES } from 'node:http';
+import type { FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
+import { HttpError } from '../errors.js';
+import { describeError, type ErrorCode, type MessageParams } from '../i18n.js';
 
-// Dutch messages for the errors Fastify creates itself (invalid input, unknown route, crashes).
-// Errors thrown by our own services are HttpErrors and already carry a Dutch message.
-const FIELD_NAMES: Record<string, string> = {
-    email: 'e-mailadres',
-    password: 'wachtwoord',
-    name: 'naam',
-    languageLevel: 'leesniveau',
-    materialTypes: 'soorten teksten',
-    topics: 'onderwerpen',
-    desiredLength: 'lengte',
-    readingGoal: 'reden om te lezen',
-    bookId: 'titel',
-    status: 'status',
-};
+export const PROBLEM_CONTENT_TYPE = 'application/problem+json; charset=utf-8';
+
+// Every error response is a problem details object (RFC 9457, application/problem+json).
+// `detail` is the text for the user, in the language of the request (Accept-Language header).
+// Error codes stay inside the backend, the client does not need them.
+export interface ProblemDetails {
+    type: string;
+    title: string;
+    status: number;
+    detail: string;
+    instance: string;
+}
+
+const KNOWN_FIELDS = new Set([
+    'email',
+    'password',
+    'name',
+    'languageLevel',
+    'materialTypes',
+    'topics',
+    'desiredLength',
+    'readingGoal',
+    'bookId',
+    'status',
+]);
 
 interface ValidationIssue {
     keyword: string;
@@ -21,60 +36,82 @@ interface ValidationIssue {
     params: Record<string, unknown>;
 }
 
-function describeIssue(issue: ValidationIssue): string {
+// Translates a schema validation problem (invalid input) to an error code.
+export function describeIssue(issue: ValidationIssue): { code: ErrorCode; params?: MessageParams } {
     const key =
         issue.keyword === 'required'
             ? String(issue.params.missingProperty)
             : (issue.instancePath.split('/').filter(Boolean)[0] ?? '');
-    const field = FIELD_NAMES[key] ?? 'invoer';
+    const field = KNOWN_FIELDS.has(key) ? key : 'input';
 
     switch (issue.keyword) {
         case 'required':
-            return `Het veld ${field} is verplicht`;
+            return { code: 'validation.required', params: { field } };
         case 'format':
             return key === 'email'
-                ? 'Vul een geldig e-mailadres in'
-                : `Het veld ${field} heeft een ongeldig formaat`;
+                ? { code: 'validation.invalidEmail' }
+                : { code: 'validation.invalidFormat', params: { field } };
         case 'minLength':
             return key === 'password'
-                ? 'Het wachtwoord moet minimaal 8 tekens lang zijn'
-                : `Het veld ${field} is niet ingevuld`;
+                ? {
+                      code: 'validation.passwordTooShort',
+                      params: { min: Number(issue.params.limit) },
+                  }
+                : { code: 'validation.empty', params: { field } };
         case 'maxLength':
-            return `Het veld ${field} is te lang`;
+            return { code: 'validation.tooLong', params: { field } };
         default:
-            return `Het veld ${field} is ongeldig`;
+            return { code: 'validation.invalid', params: { field } };
     }
 }
 
+function problem(
+    request: FastifyRequest,
+    status: number,
+    code: ErrorCode,
+    params?: MessageParams,
+): ProblemDetails {
+    return {
+        type: 'about:blank', // no extra meaning beyond the HTTP status (RFC 9457, section 4.2.1)
+        title: STATUS_CODES[status] ?? 'Error',
+        status,
+        detail: describeError(code, params, request.locale),
+        instance: request.url,
+    };
+}
+
 export default fp(async (fastify) => {
-    fastify.setNotFoundHandler((_request, reply) => {
+    fastify.setNotFoundHandler((request, reply) => {
         void reply
             .status(404)
-            .send({ statusCode: 404, error: 'Not Found', message: 'Pagina niet gevonden' });
+            .type(PROBLEM_CONTENT_TYPE)
+            .send(problem(request, 404, 'generic.notFound'));
     });
 
     fastify.setErrorHandler((error, request, reply) => {
+        const send = (status: number, code: ErrorCode, params?: MessageParams) =>
+            reply
+                .status(status)
+                .type(PROBLEM_CONTENT_TYPE)
+                .send(problem(request, status, code, params));
+
         const validation = (error as { validation?: ValidationIssue[] }).validation;
         if (validation && validation.length > 0) {
-            const first = validation[0] as ValidationIssue;
-            return reply
-                .status(400)
-                .send({ statusCode: 400, error: 'Bad Request', message: describeIssue(first) });
+            const { code, params } = describeIssue(validation[0] as ValidationIssue);
+            return send(400, code, params);
         }
 
+        if (error instanceof HttpError) {
+            return send(error.statusCode, error.code, error.params);
+        }
+
+        // Errors Fastify creates itself (broken JSON, wrong content type) and real crashes.
+        // Technical details of a crash stay in the log, not in the response.
         const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
         if (statusCode >= 500) {
             request.log.error(error);
-            return reply.status(statusCode).send({
-                statusCode,
-                error: 'Internal Server Error',
-                message: 'Er is iets misgegaan op de server. Probeer het later opnieuw.',
-            });
+            return send(statusCode, 'generic.server');
         }
-        return reply.status(statusCode).send({
-            statusCode,
-            error: error instanceof Error ? error.name : 'Error',
-            message: error instanceof Error ? error.message : 'Er is iets misgegaan',
-        });
+        return send(statusCode, 'generic.badRequest');
     });
 });

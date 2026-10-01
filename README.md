@@ -93,7 +93,9 @@ src/
     server.ts            start de server
     app.ts               bouwt de Fastify app: plugins en routes registreren
     config.ts            leest de omgevingsvariabelen
-    errors.ts            HttpError met een statuscode
+    errors.ts            HttpError met een statuscode en een foutcode
+    i18n.ts              leest teksten uit locales/nl.json (t, describeError) en kiest de taal (resolveLocale)
+    locales/             nl.json: foutmeldingen en teksten van het advies
     routes/              HTTP laag: validatie, autorisatie, aanroepen van een service
     services/            bedrijfslogica (auth, profiel, advies, leeslijst, docent, mapping)
     repositories/        toegang tot de databases, geen bedrijfslogica
@@ -105,7 +107,7 @@ src/
     readingList/         statussen van de leeslijst
     auth/                rollen
     db/                  Drizzle schema, migratie en seed
-    plugins/             Fastify plugins: postgres, mongo, auth, errorHandler
+    plugins/             Fastify plugins: postgres, mongo, auth, locale, errorHandler
     scripts/             losse commando's, zoals de catalogusimport
     types/               uitbreiding van de Fastify typen
 tests/                   unit tests
@@ -127,7 +129,11 @@ route  ->  service  ->  repository  ->  database
 
 **Entities en DTO's.** Een _entity_ beschrijft wat de database opslaat (`entities/`), een _DTO_ wat de API teruggeeft (`dto/`). Ze zijn bewust gescheiden: zo lekt een intern veld, zoals de wachtwoordhash of het Mongo `_id`, nooit per ongeluk naar buiten. De omzetting van entity naar DTO staat op één plek, in `services/mappingService.ts`.
 
-**Foutafhandeling.** Services gooien een `HttpError` met een statuscode en een Nederlandse melding. `plugins/errorHandler.ts` zet ook de fouten van Fastify zelf (ongeldige invoer, onbekende route) om naar Nederlandse meldingen en verbergt technische details bij een serverfout.
+**Foutafhandeling.** Services gooien een `HttpError` met een statuscode en een intern _foutcode_, bijvoorbeeld `throw new HttpError(409, 'auth.emailTaken')`. De code is getypeerd: een code die niet in `locales/nl.json` staat compileert niet. De code verlaat de backend niet: `plugins/errorHandler.ts` maakt er een tekst van in de taal van het verzoek en verstuurt die als problem details (RFC 9457, `Content-Type: application/problem+json`). Ook de fouten van Fastify zelf (ongeldige invoer, onbekende route) worden zo omgezet en bij een serverfout blijven technische details uit het antwoord.
+
+**Taal.** De client stuurt de gewenste taal mee in de `Accept-Language` header, bijvoorbeeld `nl`. `plugins/locale.ts` kiest met `resolveLocale` de beste taal die de backend heeft (de `q` waarden tellen mee, `nl-BE` wordt `nl`) en zet die op `request.locale`. Is er geen header of is de taal onbekend, dan is het Nederlands. Het antwoord bevat `Content-Language` en `Vary: Accept-Language`.
+
+**Teksten.** Teksten die de backend zelf maakt staan in `src/locales/nl.json` en worden opgehaald met `t('advice.motivation.topics', { topics }, locale)` uit `i18n.ts`. Dat zijn de foutmeldingen en de motivatie en beschrijving in het advies; die gebruiken allebei `request.locale`. Voor een tweede taal komt er een bestand met dezelfde sleutels bij (bijvoorbeeld `en.json`) en wordt het in `i18n.ts` aan `catalogs` toegevoegd. De frontend hoeft dan alleen de taal door te geven.
 
 ## Dataopslag
 
@@ -175,6 +181,35 @@ Alle paden beginnen met `/api`.
 | `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                                                                                        |
 | `GET /health`                                                       | iedereen | Status van beide databases                                                                                                                                   |
 
+### Foutantwoorden
+
+Elke fout is een problem details object volgens RFC 9457, met `Content-Type: application/problem+json`. `detail` is de tekst voor de gebruiker, in de taal van de `Accept-Language` header van het verzoek. De API stuurt geen eigen foutcodes mee.
+
+```json
+{
+    "type": "about:blank",
+    "title": "Bad Request",
+    "status": 400,
+    "detail": "Kies maximaal 5 onderwerpen",
+    "instance": "/api/profile"
+}
+```
+
+Clients reageren op `status`, niet op de tekst. De codes hieronder zijn intern en bepalen alleen welke tekst uit `locales/nl.json` komt.
+
+| Code                                                                            | Status        | Betekenis                                                                              |
+| ------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
+| `auth.notLoggedIn`, `auth.forbidden`                                            | 401, 403      | Geen of verlopen token, of de rol mag dit niet                                         |
+| `auth.accountGone`, `auth.emailTaken`, `auth.invalidCredentials`                | 401, 409, 401 | Account bestaat niet meer, e-mailadres in gebruik, onjuiste inloggegevens              |
+| `books.notFound`                                                                | 404           | Titel niet gevonden                                                                    |
+| `advice.profileRequired`                                                        | 409           | Eerst het leesprofiel invullen                                                         |
+| `profile.tooManyTopics` (`max`), `profile.unknownTopics` (`topics`)             | 400           | Te veel of onbekende onderwerpen                                                       |
+| `readingList.bookNotInCatalog`, `alreadyOnList`, `itemNotFound`                 | 404, 409, 404 | Titel onbekend, al op de lijst, item niet gevonden                                     |
+| `teachers.notFound`, `students.notLinked`, `students.notFound`                  | 404, 403, 404 | Docent of leerling onbekend, leerling niet gekoppeld                                   |
+| `validation.required` (`field`), `invalidFormat`, `empty`, `tooLong`, `invalid` | 400           | Ongeldige invoer, `field` is de naam van het veld in het verzoek, bijvoorbeeld `email` |
+| `validation.invalidEmail`, `validation.passwordTooShort` (`min`)                | 400           | Ongeldig e-mailadres, te kort wachtwoord                                               |
+| `generic.badRequest`, `generic.notFound`, `generic.server`                      | 400, 404, 500 | Kapot verzoek, onbekende route, onverwachte fout (zonder technische details)           |
+
 ## Adviesalgoritme
 
 Het advies is regelgebaseerd en uitlegbaar. De logica staat in `advice/scoring.ts`, de gewichten in de constante `WEIGHTS`.
@@ -199,6 +234,8 @@ De unit tests dekken de kernlogica, zonder database:
 | `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                  |
 | `readingListService.test.ts` | Toevoegen, dubbele of onbekende titels, sortering, verwijderde catalogustitels, niet bij andermans item kunnen, gelezen of ongelezen zetten |
 | `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar, koppelen en ontkoppelen van docenten                                             |
+| `errorHandler.test.ts`       | Foutantwoorden als problem details in de taal van het verzoek, ongeldige invoer, onbekende route, geen technische details bij een crash     |
+| `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten               |
 | `normalizeRow.test.ts`       | Het omzetten en opschonen van rijen uit de Excel catalogus, inclusief waarschuwingen bij ontbrekende gegevens                               |
 
 ## Coding style

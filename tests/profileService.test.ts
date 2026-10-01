@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { HttpError } from '../src/errors.js';
 import type { ProfileData } from '../src/profile/profileOptions.js';
 import { createProfileService } from '../src/services/profileService.js';
 
@@ -65,7 +66,9 @@ describe('profileService', () => {
         await assert.rejects(
             service.saveProfile('u1', { ...valid, topics: ['bestaat niet'] }),
             (err: unknown) =>
-                statusOf(err) === 400 && (err as Error).message.includes('bestaat niet'),
+                statusOf(err) === 400 &&
+                (err as HttpError).code === 'profile.unknownTopics' &&
+                (err as HttpError).params?.topics === 'bestaat niet',
         );
         assert.equal(calls.length, 0);
     });
@@ -74,7 +77,10 @@ describe('profileService', () => {
         const { service } = setup(['a', 'b', 'c', 'd', 'e', 'f']);
         await assert.rejects(
             service.saveProfile('u1', { ...valid, topics: ['a', 'b', 'c', 'd', 'e', 'f'] }),
-            (err: unknown) => statusOf(err) === 400,
+            (err: unknown) =>
+                statusOf(err) === 400 &&
+                (err as HttpError).code === 'profile.tooManyTopics' &&
+                (err as HttpError).params?.max === 5,
         );
     });
 });
