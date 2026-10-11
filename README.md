@@ -351,13 +351,42 @@ De pipeline staat in `.github/workflows/ci-cd.yml` (GitHub Actions) en draait bi
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Build, lint and test` | `npm ci`, typecheck, ESLint, Prettier controle, tests met coverage (`npm run test:ci`), productiebuild en een Docker build. Het testrapport en de coverage staan in de samenvatting van de run, het JUnit bestand is te downloaden als artifact. |
 | `Dependency scan`      | `npm audit --audit-level=high`: de pipeline faalt bij een bekende ernstige kwetsbaarheid.                                                                                                                                                        |
-| `Deploy to Azure`      | Alleen op `main` en pas als beide jobs groen zijn. Bouwt de image, pusht hem naar Azure Container Registry, werkt de Container App bij en doet een smoke test op `/api/health`.                                                                  |
+| `Deploy to Render`     | Alleen op `main` en pas als beide jobs groen zijn. Start via een deploy hook een deploy van precies deze commit, wacht tot Render meldt dat hij live is en doet een smoke test op `/api/health`.                                                 |
 
 Maak in de branch protection van `main` de checks `Build, lint and test` en `Dependency scan` verplicht, dan kan een rode pipeline niet gemerged worden. De test `openapi.test.ts` zorgt er ook voor dat `openapi.json` altijd bij de code past.
 
-**Eenmalig inrichten van Azure.** `deploy/azure-setup.sh` maakt de resource group, het registry, PostgreSQL en twee Container Apps (API en web) aan, zet de geheimen in Azure en richt een koppeling met GitHub in zonder opgeslagen wachtwoord (OpenID Connect). De uitvoer van het script bevat de variabelen die je in de GitHub environment `production` van beide repositories zet. Het script vraagt zelf om `GITHUB_ORG` en `MONGO_URL` (bijvoorbeeld een Atlas cluster). De geheimen (JWT, databasewachtwoorden) staan alleen in Azure en nooit in de repository.
+### Waar draait wat
 
-**Docker.** De `Dockerfile` bouwt in drie stappen een kleine image zonder dev dependencies die als gewone gebruiker draait. Bij het starten worden eerst de migraties uitgevoerd. Lokaal proberen: `docker build -t smart-reading-coach-api .`
+| Onderdeel  | Dienst                       | Waarom                                                                              |
+| ---------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| API        | Render, web service (Docker) | Gratis, bouwt de `Dockerfile` en wordt beschreven in `render.yaml`.                 |
+| Website    | Render, static site          | Gratis en slaapt nooit. Zie de `render.yaml` van de frontend.                       |
+| PostgreSQL | Neon                         | Blijvend gratis (1 GB). De gratis database van Render wordt na 30 dagen verwijderd. |
+| MongoDB    | MongoDB Atlas (M0)           | Blijvend gratis (512 MB).                                                           |
+
+De gratis API slaapt na 15 minuten zonder verkeer en heeft ongeveer een minuut nodig om wakker te worden. Het eerste verzoek na een pauze is dus traag. Neon wordt ook na een paar minuten stilgezet en start automatisch weer op.
+
+### Eenmalig inrichten
+
+1. **Neon.** Maak op neon.tech een gratis project aan (regio Frankfurt). Kopieer de connection string, die eindigt op `?sslmode=require`.
+2. **MongoDB Atlas.** Maak op cloud.mongodb.com een gratis M0 cluster. Maak een databasegebruiker aan, zet onder Network Access het adres `0.0.0.0/0` open (Render heeft geen vast IP) en kopieer de `mongodb+srv://` string met je wachtwoord erin.
+3. **Render, API.** Kies op render.com New, Blueprint en koppel deze repository. Render leest `render.yaml` en vraagt om `POSTGRES_URL`, `MONGO_URL` en `CORS_ORIGIN`. Vul `CORS_ORIGIN` voorlopig met `https://smart-reading-coach.onrender.com` in, je past dit in stap 6 aan. Het JWT geheim wordt door Render zelf gemaakt. De eerste deploy draait de migraties.
+4. **Deploy hook en API key.** Open de service, Settings, Deploy Hook, en kopieer de URL. Maak onder Account Settings, API Keys een key aan.
+5. **GitHub.** Maak in deze repository onder Settings, Environments een environment `production`. Zet daarin de secrets `RENDER_DEPLOY_HOOK_URL` en `RENDER_API_KEY` en de variabele `API_URL` (bijvoorbeeld `https://smart-reading-coach-api.onrender.com`).
+6. **De website.** Doe stap 3 tot en met 5 ook voor de frontend repository. Daar vraagt Render om `VITE_API_URL`, bijvoorbeeld `https://smart-reading-coach-api.onrender.com/api`, en de variabele in GitHub heet `WEB_URL`. Pas daarna in de API service `CORS_ORIGIN` aan naar het echte adres van de website.
+7. **Data laden.** De gratis Render services hebben geen shell, dus laad de data vanaf je eigen computer. Zet in PowerShell de gegevens van Neon en Atlas in de omgeving en draai de scripts:
+    ```powershell
+    $env:POSTGRES_URL = '<neon string>'
+    $env:MONGO_URL = '<atlas string>'
+    npm run db:seed
+    npm run import:catalog
+    ```
+    Omgevingsvariabelen gaan voor op `.env`, dus je `.env` hoef je niet aan te passen. Het seed script maakt de demo accounts aan, ook het docentaccount. Verander de wachtwoorden als je de website deelt.
+8. **Deploy.** Push naar `main` of start de workflow handmatig onder Actions. Daarna is elke push naar `main` met groene checks automatisch live.
+
+### Docker
+
+De `Dockerfile` bouwt in drie stappen een kleine image zonder dev dependencies die als gewone gebruiker draait. Bij het starten worden eerst de migraties uitgevoerd. Lokaal proberen: `docker build -t smart-reading-coach-api .`
 
 ## Coding style
 

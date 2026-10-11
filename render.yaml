@@ -1,0 +1,27 @@
+# Render Blueprint: describes the API service so it can be created (and recreated) from code.
+# Free plan: the service sleeps after 15 minutes without traffic and needs about a minute to wake up.
+# PostgreSQL lives on Neon and MongoDB on Atlas (both have a permanent free plan), because the
+# free PostgreSQL of Render is deleted after 30 days.
+services:
+    - type: web
+      runtime: docker
+      name: smart-reading-coach-api
+      plan: free
+      dockerfilePath: ./Dockerfile
+      healthCheckPath: /api/health
+      # The GitHub Actions pipeline starts every deploy (deploy hook), after the checks are green.
+      autoDeployTrigger: off
+      envVars:
+          - key: NODE_ENV
+            value: production
+          - key: MONGO_DB
+            value: smart_reading_coach_files
+          - key: JWT_SECRET
+            generateValue: true
+          # Asked for in the Render dashboard when the blueprint is created:
+          - key: POSTGRES_URL # Neon connection string, ends with ?sslmode=require
+            sync: false
+          - key: MONGO_URL # Atlas connection string (mongodb+srv://...)
+            sync: false
+          - key: CORS_ORIGIN # address of the website, for example https://smart-reading-coach.onrender.com
+            sync: false

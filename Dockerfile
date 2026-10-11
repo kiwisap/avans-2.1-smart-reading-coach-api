@@ -31,9 +31,9 @@ COPY --chown=node:node data ./data
 USER node
 EXPOSE 3000
 
-# Used by "docker run" and docker compose. Azure Container Apps has its own health probes.
+# Used by "docker run" and docker compose. Render checks /api/health itself (see render.yaml).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
+    CMD wget -qO- "http://127.0.0.1:${PORT:-3000}/api/health" || exit 1
 
 # Apply database migrations first, then start the server. All settings come from environment
 # variables (see .env.example), there is no .env file in the image.
