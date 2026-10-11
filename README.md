@@ -80,6 +80,7 @@ Het bestand `.env` staat in `.gitignore` en wordt nooit gecommit.
 | `npm run lint`, `npm run lint:fix`       | ESLint draaien, eventueel met automatische fixes                        |
 | `npm run format`, `npm run format:check` | Prettier toepassen of controleren                                       |
 | `npm test`                               | Alle unit tests draaien                                                 |
+| `npm run test:ci`                        | Tests met coverage en een JUnit bestand, zoals de pipeline ze draait    |
 | `npm run check`                          | Typecheck, lint, formatcontrole en tests in één keer                    |
 | `npm run db:generate`                    | Een nieuwe migratie maken na een wijziging in `src/db/schema.ts`        |
 | `npm run db:migrate`                     | Migraties uitvoeren                                                     |
@@ -341,6 +342,22 @@ De unit tests dekken de kernlogica, zonder database:
 | `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten                                                |
 | `openapi.test.ts`            | Elke route staat in de specificatie met tag, samenvatting en beveiliging, `openapi.json` is actueel, DTO's en antwoorden passen bij de schema's, fouten zijn problem details |
 | `normalizeRow.test.ts`       | Het omzetten en opschonen van rijen uit de Excel catalogus, inclusief waarschuwingen bij ontbrekende gegevens                                                                |
+
+## CI/CD en deployment
+
+De pipeline staat in `.github/workflows/ci-cd.yml` (GitHub Actions) en draait bij elke push en pull request.
+
+| Job                    | Wat hij doet                                                                                                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Build, lint and test` | `npm ci`, typecheck, ESLint, Prettier controle, tests met coverage (`npm run test:ci`), productiebuild en een Docker build. Het testrapport en de coverage staan in de samenvatting van de run, het JUnit bestand is te downloaden als artifact. |
+| `Dependency scan`      | `npm audit --audit-level=high`: de pipeline faalt bij een bekende ernstige kwetsbaarheid.                                                                                                                                                        |
+| `Deploy to Azure`      | Alleen op `main` en pas als beide jobs groen zijn. Bouwt de image, pusht hem naar Azure Container Registry, werkt de Container App bij en doet een smoke test op `/api/health`.                                                                  |
+
+Maak in de branch protection van `main` de checks `Build, lint and test` en `Dependency scan` verplicht, dan kan een rode pipeline niet gemerged worden. De test `openapi.test.ts` zorgt er ook voor dat `openapi.json` altijd bij de code past.
+
+**Eenmalig inrichten van Azure.** `deploy/azure-setup.sh` maakt de resource group, het registry, PostgreSQL en twee Container Apps (API en web) aan, zet de geheimen in Azure en richt een koppeling met GitHub in zonder opgeslagen wachtwoord (OpenID Connect). De uitvoer van het script bevat de variabelen die je in de GitHub environment `production` van beide repositories zet. Het script vraagt zelf om `GITHUB_ORG` en `MONGO_URL` (bijvoorbeeld een Atlas cluster). De geheimen (JWT, databasewachtwoorden) staan alleen in Azure en nooit in de repository.
+
+**Docker.** De `Dockerfile` bouwt in drie stappen een kleine image zonder dev dependencies die als gewone gebruiker draait. Bij het starten worden eerst de migraties uitgevoerd. Lokaal proberen: `docker build -t smart-reading-coach-api .`
 
 ## Coding style
 
