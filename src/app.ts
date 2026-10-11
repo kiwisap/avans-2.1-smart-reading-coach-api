@@ -6,14 +6,8 @@ import mongo from './plugins/mongo.js';
 import auth from './plugins/auth.js';
 import errorHandler from './plugins/errorHandler.js';
 import locale from './plugins/locale.js';
-import healthRoutes from './routes/health.js';
-import authRoutes from './routes/auth.js';
-import studentRoutes from './routes/students.js';
-import bookRoutes from './routes/books.js';
-import profileRoutes from './routes/profile.js';
-import adviceRoutes from './routes/advice.js';
-import readingListRoutes from './routes/readingList.js';
-import teacherRoutes from './routes/teachers.js';
+import { registerDocs } from './openapi/docs.js';
+import { registerRoutes } from './routes/index.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
     const app = Fastify({ logger: true });
@@ -28,14 +22,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     await app.register(mongo, { url: config.mongoUrl, dbName: config.mongoDb });
     await app.register(auth, { secret: config.jwtSecret, expiresIn: config.jwtExpiresIn });
 
-    await app.register(healthRoutes, { prefix: '/api' });
-    await app.register(authRoutes, { prefix: '/api' });
-    await app.register(studentRoutes, { prefix: '/api' });
-    await app.register(bookRoutes, { prefix: '/api' });
-    await app.register(profileRoutes, { prefix: '/api' });
-    await app.register(adviceRoutes, { prefix: '/api' });
-    await app.register(readingListRoutes, { prefix: '/api' });
-    await app.register(teacherRoutes, { prefix: '/api' });
+    // API documentation: Swagger UI on /api/docs, built from the same schemas the routes use.
+    await registerDocs(app, { ui: true });
+    await registerRoutes(app);
 
     return app;
 }

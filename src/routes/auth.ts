@@ -3,6 +3,7 @@ import type { LoginDto } from '../dto/loginDto.js';
 import type { RegisterDto } from '../dto/registerDto.js';
 import type { UserDto } from '../dto/userDto.js';
 import { HttpError } from '../errors.js';
+import { ok, problems, secured, wrap } from '../openapi/helpers.js';
 import { createUserRepository } from '../repositories/userRepository.js';
 import { createAuthService } from '../services/authService.js';
 import { toUserDto } from '../services/mappingService.js';
@@ -13,6 +14,11 @@ const credentials = {
 };
 
 const registerSchema = {
+    tags: ['Auth'],
+    summary: 'Create a student account',
+    description:
+        'New accounts are students. The response contains a token, so the user is logged in.',
+    response: { 201: ok('AuthResponse', 'Account created.'), ...problems(400, 409) },
     body: {
         type: 'object',
         required: ['email', 'password', 'name'],
@@ -25,6 +31,9 @@ const registerSchema = {
 };
 
 const loginSchema = {
+    tags: ['Auth'],
+    summary: 'Log in with email and password',
+    response: { 200: ok('AuthResponse', 'Logged in.'), ...problems(400, 401) },
     body: {
         type: 'object',
         required: ['email', 'password'],
@@ -34,6 +43,13 @@ const loginSchema = {
             password: { type: 'string', minLength: 1, maxLength: 72 },
         },
     },
+};
+
+const meSchema = {
+    tags: ['Auth'],
+    summary: 'Get the logged in user',
+    security: secured,
+    response: { 200: wrap('user', 'User', 'The logged in user.'), ...problems(401) },
 };
 
 export default async function authRoutes(fastify: FastifyInstance): Promise<void> {
@@ -57,9 +73,13 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
         return { token: issueToken(user), user };
     });
 
-    fastify.get('/auth/me', { preHandler: fastify.authenticate }, async (request) => {
-        const user = await userRepository.findById(request.user.sub);
-        if (!user) throw new HttpError(401, 'auth.accountGone');
-        return { user: toUserDto(user) };
-    });
+    fastify.get(
+        '/auth/me',
+        { preHandler: fastify.authenticate, schema: meSchema },
+        async (request) => {
+            const user = await userRepository.findById(request.user.sub);
+            if (!user) throw new HttpError(401, 'auth.accountGone');
+            return { user: toUserDto(user) };
+        },
+    );
 }

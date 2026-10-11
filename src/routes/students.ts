@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { problems, secured, wrap } from '../openapi/helpers.js';
 import { createBookRepository } from '../repositories/bookRepository.js';
 import { createProfileRepository } from '../repositories/profileRepository.js';
 import { createReadingListRepository } from '../repositories/readingListRepository.js';
@@ -9,10 +10,39 @@ import { createTeacherService } from '../services/teacherService.js';
 const studentParams = {
     type: 'object',
     required: ['studentId'],
-    properties: { studentId: { type: 'string', format: 'uuid' } },
+    properties: { studentId: { type: 'string', format: 'uuid', description: 'Student id.' } },
+};
+
+const listSchema = {
+    tags: ['Students'],
+    summary: 'List the students that linked this teacher',
+    security: secured,
+    response: {
+        200: wrap('students', 'StudentSummary', 'Linked students.', true),
+        ...problems(401, 403),
+    },
+};
+
+const overviewSchema = {
+    tags: ['Students'],
+    summary: 'See the profile and reading list of one student',
+    description: 'Only for students who linked this teacher.',
+    security: secured,
+    params: studentParams,
+    response: {
+        200: { description: 'Student, profile and reading list.', $ref: 'StudentOverview#' },
+        ...problems(400, 401, 403, 404),
+    },
 };
 
 const addTitleSchema = {
+    tags: ['Students'],
+    summary: 'Add a book to the reading list of a student',
+    security: secured,
+    response: {
+        201: wrap('item', 'ReadingListItem', 'Added.'),
+        ...problems(400, 401, 403, 404, 409),
+    },
     params: studentParams,
     body: {
         type: 'object',
@@ -36,13 +66,13 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
     // Teachers only. Access to a specific student is checked again in the service.
     const preHandler = fastify.authorize('teacher');
 
-    fastify.get('/students', { preHandler }, async (request) => ({
+    fastify.get('/students', { preHandler, schema: listSchema }, async (request) => ({
         students: await teacherService.listStudents(request.user.sub),
     }));
 
     fastify.get<{ Params: { studentId: string } }>(
         '/students/:studentId',
-        { preHandler, schema: { params: studentParams } },
+        { preHandler, schema: overviewSchema },
         async (request) =>
             teacherService.getStudentOverview(request.user.sub, request.params.studentId),
     );

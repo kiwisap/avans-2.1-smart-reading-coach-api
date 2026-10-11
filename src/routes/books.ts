@@ -1,12 +1,22 @@
 import type { FastifyInstance } from 'fastify';
 import { HttpError } from '../errors.js';
+import { ok, problems, secured } from '../openapi/helpers.js';
 import { createBookRepository, type BookSearch } from '../repositories/bookRepository.js';
 
 const listSchema = {
+    tags: ['Catalog'],
+    summary: 'Search and filter the catalog',
+    description: 'A book matches when it fits one of the values of every filter that is given.',
+    security: secured,
+    response: { 200: ok('BookPage', 'One page of books.'), ...problems(400, 401) },
     querystring: {
         type: 'object',
         properties: {
-            search: { type: 'string', maxLength: 100 },
+            search: {
+                type: 'string',
+                maxLength: 100,
+                description: 'Words in the title or author.',
+            },
             // type, level and theme are repeatable (?theme=a&theme=b): a book matches when it
             // fits at least one value per filter, and all filters have to match.
             type: { type: 'array', items: { type: 'string', maxLength: 30 }, maxItems: 10 },
@@ -22,7 +32,21 @@ const listSchema = {
     },
 };
 
+const filtersSchema = {
+    tags: ['Catalog'],
+    summary: 'List the values to filter on',
+    security: secured,
+    response: {
+        200: ok('BookFacets', 'Types, levels and themes in the catalog.'),
+        ...problems(401),
+    },
+};
+
 const idSchema = {
+    tags: ['Catalog'],
+    summary: 'Get one book',
+    security: secured,
+    response: { 200: ok('Book', 'The book.'), ...problems(400, 401, 404) },
     params: {
         type: 'object',
         required: ['id'],
@@ -47,7 +71,9 @@ export default async function bookRoutes(fastify: FastifyInstance): Promise<void
         },
     );
 
-    fastify.get('/books/filters', { preHandler }, async () => bookRepository.facets());
+    fastify.get('/books/filters', { preHandler, schema: filtersSchema }, async () =>
+        bookRepository.facets(),
+    );
 
     fastify.get<{ Params: { id: string } }>(
         '/books/:id',

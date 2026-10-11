@@ -85,18 +85,19 @@ Het bestand `.env` staat in `.gitignore` en wordt nooit gecommit.
 | `npm run db:migrate`                     | Migraties uitvoeren                                                     |
 | `npm run db:seed`                        | Demo accounts aanmaken                                                  |
 | `npm run import:catalog`                 | De Excel catalogus in `data/leescatalogus.xlsx` naar MongoDB importeren |
+| `npm run openapi`                        | De OpenAPI specificatie schrijven naar `openapi.json`                   |
 
 ## Mappenstructuur
 
 ```
 src/
     server.ts            start de server
-    app.ts               bouwt de Fastify app: plugins en routes registreren
+    app.ts               bouwt de Fastify app: plugins, documentatie en routes registreren
     config.ts            leest de omgevingsvariabelen
     errors.ts            HttpError met een statuscode en een foutcode
     i18n.ts              leest teksten uit locales/nl.json (t, describeError) en kiest de taal (resolveLocale)
     locales/             nl.json: foutmeldingen en teksten van het advies
-    routes/              HTTP laag: validatie, autorisatie, aanroepen van een service
+    routes/              HTTP laag: validatie, autorisatie, aanroepen van een service (index.ts registreert ze allemaal)
     services/            bedrijfslogica (auth, profiel, advies, leeslijst, docent, mapping)
     repositories/        toegang tot de databases, geen bedrijfslogica
     entities/            typen van wat in de databases staat (User, ReadingProfile, ReadingListItem, Book)
@@ -108,14 +109,45 @@ src/
     auth/                rollen
     db/                  Drizzle schema, migratie en seed
     plugins/             Fastify plugins: postgres, mongo, auth, locale, errorHandler
+    openapi/             gedeelde schema's, documentatie-instellingen en de generator van openapi.json
     scripts/             losse commando's, zoals de catalogusimport
     types/               uitbreiding van de Fastify typen
 tests/                   unit tests
 drizzle/                 gegenereerde SQL migraties
 data/                    de catalogus als Excel bestand
+openapi.json             gegenereerde API specificatie (npm run openapi)
 ```
 
 ## Architectuur
+
+### Systeemoverzicht
+
+```mermaid
+flowchart LR
+    subgraph Browser
+        FE["Frontend<br/>React 19, Vite, React Router"]
+    end
+
+    subgraph API["Backend: Fastify 5 (Node.js, TypeScript)"]
+        direction TB
+        R["Routes<br/>validatie, JWT, rollen"]
+        S["Services<br/>bedrijfslogica"]
+        Rep["Repositories<br/>toegang tot data"]
+        R --> S --> Rep
+    end
+
+    PG[("PostgreSQL<br/>users, profielen, leeslijst")]
+    MG[("MongoDB<br/>catalogus: books")]
+
+    FE -- "REST, JSON, Bearer token" --> R
+    Rep -- "Drizzle ORM" --> PG
+    Rep -- "MongoDB driver" --> MG
+    API -. "openapi.json" .-> FE
+```
+
+De frontend praat alleen met de API. De API is de enige die de databases aanspreekt. De stippellijn is het contract: de API beschrijft zichzelf in `openapi.json` en de frontend genereert daar zijn types uit (zie OpenAPI hieronder).
+
+### Lagen
 
 De code is opgebouwd in vaste lagen. Een verzoek gaat er altijd in dezelfde volgorde doorheen:
 
@@ -149,6 +181,77 @@ Elk soort data staat in de opslag die er het beste bij past.
 | `reading_list_items` | De leeslijst, uniek per combinatie van leerling en titel |
 
 **MongoDB** bevat de catalogus in de collectie `books`. Titels hebben wisselende metadata (boeken hebben een genre, artikelen alleen thema's), en dat past bij een documentdatabase. Een uniek veld `key` (genormaliseerde titel, auteur en soort) voorkomt dubbele titels bij het importeren. Een titel in de leeslijst verwijst met het Mongo id naar de catalogus. De koppeling tussen beide databases gebeurt in `readingListService`.
+
+### ERD
+
+```mermaid
+erDiagram
+    USERS ||--o| READING_PROFILES : "heeft een profiel (leerling)"
+    USERS ||--o{ READING_LIST_ITEMS : "heeft een leeslijst (leerling)"
+    USERS ||--o{ TEACHER_STUDENTS : "volgt leerlingen (docent)"
+    USERS ||--o{ TEACHER_STUDENTS : "wordt gevolgd (leerling)"
+    READING_LIST_ITEMS }o..|| BOOKS : "book_id, geen foreign key"
+
+    USERS {
+        uuid id PK
+        text email UK
+        text password_hash
+        text name
+        user_role role "student of teacher"
+        timestamptz created_at
+    }
+    TEACHER_STUDENTS {
+        uuid teacher_id PK, FK
+        uuid student_id PK, FK
+    }
+    READING_PROFILES {
+        uuid user_id PK, FK
+        language_level language_level
+        text_array material_types
+        text_array topics
+        desired_length desired_length
+        reading_goal reading_goal
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    READING_LIST_ITEMS {
+        uuid id PK
+        uuid user_id FK "uniek samen met book_id"
+        text book_id "Mongo id"
+        reading_status status "unread of read"
+        timestamptz added_at
+        timestamptz read_at
+    }
+    BOOKS {
+        ObjectId _id PK "MongoDB, collectie books"
+        string key UK "genormaliseerde titel, auteur en soort"
+        string title
+        string author
+        string type
+        string genre
+        string format
+        string description
+        array themes
+        array levels
+        string levelLabel
+        string url
+        date createdAt
+        date updatedAt
+    }
+```
+
+De vier bovenste tabellen staan in PostgreSQL en worden beheerd met Drizzle (`src/db/schema.ts`) en SQL migraties in `drizzle/`. `BOOKS` staat in MongoDB. Een foreign key tussen beide databases bestaat niet, daarom controleert `readingListService` bij het toevoegen dat de titel in de catalogus staat. Verwijder je een gebruiker, dan verdwijnen profiel, leeslijst en koppelingen mee (`ON DELETE CASCADE`).
+
+## OpenAPI en het contract met de frontend
+
+De API beschrijft zichzelf met OpenAPI 3.0. Het contract wordt niet apart bijgehouden: dezelfde JSON schema's die de routes gebruiken om invoer te valideren en antwoorden te serialiseren, worden door `@fastify/swagger` omgezet in de specificatie.
+
+- **Swagger UI**: met de API gestart staat de interactieve documentatie op `http://localhost:3000/api/docs`. Klik op _Authorize_ en plak een token uit `POST /api/auth/login` om beveiligde routes uit te proberen.
+- **`openapi.json`**: `npm run openapi` schrijft de specificatie naar dit bestand. Het bestand staat in git en de frontend genereert er zijn TypeScript types uit (`npm run api:types` in de frontend). Dat werkt zonder draaiende databases, omdat het script de routes registreert met een lege vervanger voor de databaseverbindingen (`src/openapi/buildSpec.ts`).
+- **Gedeelde schema's** staan in `src/openapi/schemas.ts` (`Book`, `ReadingListItem`, `ProblemDetails` en andere). Routes verwijzen ernaar met `{ $ref: 'Book#' }`. Elke route heeft een tag, samenvatting, beveiligingseis en alle antwoorden die kunnen voorkomen. Foutantwoorden zijn `application/problem+json`.
+- **Antwoordschema's zijn ook een vangnet**: Fastify serialiseert antwoorden met het schema, dus een veld dat niet in het schema staat komt niet in het antwoord.
+
+Wijzig je een route of schema, draai dan `npm run openapi` en commit `openapi.json`. De test `tests/openapi.test.ts` faalt als het bestand niet meer klopt met de code, als een route geen documentatie heeft, of als een DTO niet meer past bij zijn schema.
 
 ## Authenticatie en autorisatie
 
@@ -227,16 +330,17 @@ npm test
 
 De unit tests dekken de kernlogica, zonder database:
 
-| Bestand                      | Wat wordt getest                                                                                                                            |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scoring.test.ts`            | Puntentelling, te moeilijke titels, motivatietekst en het randgeval van een titel zonder niveau                                             |
-| `adviceService.test.ts`      | Eerst een profiel invullen, beste treffer bovenaan, minstens drie suggesties, nooit een te moeilijke titel                                  |
-| `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                  |
-| `readingListService.test.ts` | Toevoegen, dubbele of onbekende titels, sortering, verwijderde catalogustitels, niet bij andermans item kunnen, gelezen of ongelezen zetten |
-| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar, koppelen en ontkoppelen van docenten                                             |
-| `errorHandler.test.ts`       | Foutantwoorden als problem details in de taal van het verzoek, ongeldige invoer, onbekende route, geen technische details bij een crash     |
-| `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten               |
-| `normalizeRow.test.ts`       | Het omzetten en opschonen van rijen uit de Excel catalogus, inclusief waarschuwingen bij ontbrekende gegevens                               |
+| Bestand                      | Wat wordt getest                                                                                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scoring.test.ts`            | Puntentelling, te moeilijke titels, motivatietekst en het randgeval van een titel zonder niveau                                                                              |
+| `adviceService.test.ts`      | Eerst een profiel invullen, beste treffer bovenaan, minstens drie suggesties, nooit een te moeilijke titel                                                                   |
+| `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                                                   |
+| `readingListService.test.ts` | Toevoegen, dubbele of onbekende titels, sortering, verwijderde catalogustitels, niet bij andermans item kunnen, gelezen of ongelezen zetten                                  |
+| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar, koppelen en ontkoppelen van docenten                                                                              |
+| `errorHandler.test.ts`       | Foutantwoorden als problem details in de taal van het verzoek, ongeldige invoer, onbekende route, geen technische details bij een crash                                      |
+| `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten                                                |
+| `openapi.test.ts`            | Elke route staat in de specificatie met tag, samenvatting en beveiliging, `openapi.json` is actueel, DTO's en antwoorden passen bij de schema's, fouten zijn problem details |
+| `normalizeRow.test.ts`       | Het omzetten en opschonen van rijen uit de Excel catalogus, inclusief waarschuwingen bij ontbrekende gegevens                                                                |
 
 ## Coding style
 

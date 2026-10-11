@@ -5,7 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-    globalIgnores(['dist', 'node_modules', 'drizzle', '_to_delete']),
+    globalIgnores(['dist', 'node_modules', 'drizzle']),
 
     {
         files: ['**/*.ts'],
