@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildMotivation, describeBook } from '../src/advice/motivation.js';
+import { buildReasons, buildStory, describeBook } from '../src/advice/motivation.js';
 import { allowedLevels, scoreBook, type ScorableBook } from '../src/advice/scoring.js';
 import type { ProfileData } from '../src/profile/profileOptions.js';
 
@@ -68,9 +68,19 @@ describe('motivation', () => {
     it('only mentions what actually matched', () => {
         const b = book({ themes: ['liefde'] });
         const { reasons } = score(profile, b);
-        const text = buildMotivation(profile, b, reasons);
+        const text = buildReasons(profile, b, reasons).join(' ');
         assert.match(text, /liefde/);
         assert.doesNotMatch(text, /familie/);
+    });
+
+    it('tells a short story instead of a list', () => {
+        const b = book({ themes: ['liefde'] });
+        const { reasons } = score(profile, b);
+        const story = buildStory(profile, { ...b, id: 'b1' }, reasons);
+        assert.match(story, /liefde/);
+        assert.match(story, /^[A-Z].*\.$/);
+        assert.ok(story.split('. ').length >= 2, story);
+        assert.doesNotMatch(story, /familie/);
     });
 
     it('describeBook falls back to a generated sentence without a description', () => {

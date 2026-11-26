@@ -76,7 +76,7 @@ Het bestand `.env` staat in `.gitignore` en wordt nooit gecommit.
 
 ### Opnieuw beginnen
 
-`docker compose down -v` verwijdert de containers en beide databases. Draai daarna stap 3 en 4 opnieuw. `npm run import:catalog` mag je vaker draaien: bestaande titels worden bijgewerkt in plaats van dubbel opgeslagen.
+`docker compose down -v` verwijdert de containers en beide databases. Draai daarna stap 3 en 4 opnieuw. `npm run import:catalog` mag je vaker draaien: bestaande titels worden bijgewerkt in plaats van dubbel opgeslagen. Staat `AI_SERVICE_URL` in `.env`, dan vraagt de import de AI service daarna om een nieuw model op de nieuwe catalogus.
 
 ## Scripts
 
@@ -197,6 +197,10 @@ Elk soort data staat in de opslag die er het beste bij past.
 | `xp_events`          | Verdiende XP, één regel per reden en titel, zodat niets dubbel telt                                               |
 
 **MongoDB** bevat de catalogus in de collectie `books`. Titels hebben wisselende metadata (boeken hebben een genre, artikelen alleen thema's), en dat past bij een documentdatabase. Een uniek veld `key` (genormaliseerde titel, auteur en soort) voorkomt dubbele titels bij het importeren. Een titel in de leeslijst verwijst met het Mongo id naar de catalogus. De koppeling tussen beide databases gebeurt in `readingListService`.
+
+Bij elk boek bewaart de import ook de originele rij(en) uit de spreadsheet in `sources`, met alle kolommen. De API stuurt dat veld nooit mee; het is voor de AI service, die de catalogus uit MongoDB leest en daarop traint. Staat een titel twee keer in de sheet, dan toont de app hem één keer en bewaart `sources` beide rijen.
+
+De collectie `topic_synonyms` is van de AI service: na elke training schrijft die per onderwerp de thema's met dezelfde of een nauwere betekenis, geleerd uit de Open Multilingual Wordnet (bijvoorbeeld _maatschappij_ en _samenleving_). De API leest hem alleen, voor de regels van het advies.
 
 ### ERD
 
@@ -361,20 +365,20 @@ Clients reageren op `status`, niet op de tekst. De codes hieronder zijn intern e
 
 Het advies komt van het AI model, met de regels als vangnet. De logica staat in `services/adviceService.ts`.
 
-1. **AI model.** De API stuurt het leesprofiel en de leeslijst (als catalogus keys) naar de AI service (`advice/aiClient.ts`). Het model in `smart-reading-coach-ai` combineert niveau, soort tekst, genre, leestijd, tekstovereenkomst met de onderwerpen en de smaak van vergelijkbare leerlingen, en geeft vijf titels met redenen terug. Titels die al op de leeslijst staan worden niet opnieuw aangeraden. De API zoekt de titels op in MongoDB via hun `key`. Het antwoord heeft `source: "ai"`.
+1. **AI model.** De API stuurt het leesprofiel en de leeslijst (als catalogus keys) naar de AI service (`advice/aiClient.ts`). Het model in `smart-reading-coach-ai` combineert niveau, soort tekst, genre, leestijd, tekstovereenkomst met de onderwerpen en de smaak van vergelijkbare leerlingen, en geeft vijf titels terug, elk met een kort verhaaltje van Bo (`motivation`) en de losse redenen erachter (`reasons`). Titels die al op de leeslijst staan worden niet opnieuw aangeraden. De API zoekt de titels op in MongoDB via hun `key`. Het antwoord heeft `source: "ai"`.
 2. **Regels als vangnet.** Is `AI_SERVICE_URL` niet ingesteld, antwoordt de service niet binnen `AI_TIMEOUT_MS`, geeft hij een fout of staan er minder dan drie van de titels in de catalogus, dan gebruikt de API de regels. Het antwoord heeft dan `source: "rules"`.
 
 De regels (`advice/scoring.ts`, gewichten in `WEIGHTS`):
 
 1. Titels die moeilijker zijn dan het niveau van de leerling vallen af.
-2. Elke overgebleven titel krijgt punten: niveau exact (3), makkelijker niveau (1), per overeenkomend onderwerp (3), gewenste soort tekst (2), passende lengte (1) en passend bij het leesdoel (1). De catalogus heeft geen aantal bladzijden, dus de lengte wordt geschat op basis van de soort tekst.
+2. Elke overgebleven titel krijgt punten: niveau exact (3), makkelijker niveau (1), per overeenkomend onderwerp (3; een onderwerp past ook bij een thema dat de AI service als synoniem of nauwere betekenis leerde, uit `topic_synonyms`), gewenste soort tekst (2), passende lengte (1) en passend bij het leesdoel (1). De catalogus heeft geen aantal bladzijden, dus de lengte wordt geschat op basis van de soort tekst.
 3. De hoogste scores worden aangeboden, maximaal vijf. Zijn er te weinig treffers, dan wordt de selectie verbreed naar alles op het niveau van de leerling, zodat er altijd minstens drie suggesties zijn.
-4. De redenen "Waarom dit bij je past" (`advice/motivation.ts`) worden alleen opgebouwd uit wat echt overeenkwam.
+4. "Waarom dit bij je past" (`advice/motivation.ts`) is een kort verhaaltje met een opening (de onderwerpen of het leesdoel), een middenstuk (soort tekst, niveau en lengte) en een afsluiter. Elke zin komt uit iets dat echt overeenkwam; de zinnen staan in `src/locales/nl.json` onder `advice.story`. De losse redenen staan in `reasons`, voor de docent.
 
 Voor beide bronnen geldt:
 
 - **Het advies verandert mee.** Titels op de leeslijst (gelezen of bewaard) komen nooit in het advies. Het AI model laat ze zelf al weg, de API filtert ze daarna nog een keer, ook als het model de key niet kende.
-- **Sterren van vergelijkbare leerlingen tellen mee.** Na het lezen vraagt Bo om een beoordeling. Ratings van andere leerlingen met hetzelfde leesniveau en minstens één gedeeld onderwerp (`ratingRepository.peerRatings`) tellen vanaf twee stemmen mee. Bij de regels schuift een titel op met `(gemiddelde - 3) x 1,5` punten. Bij beide bronnen valt een titel onder de twee sterren af, en vanaf 3,5 sterren noemt Bo het als reden. De eigen sterren gaan als `rating` mee in de geschiedenis naar het AI model.
+- **Sterren van vergelijkbare leerlingen tellen mee.** Na het lezen vraagt Bo om een beoordeling. Ratings van andere leerlingen met hetzelfde leesniveau en minstens één gedeeld onderwerp (`ratingRepository.peerRatings`) tellen vanaf twee stemmen mee. Bij de regels schuift een titel op met `(gemiddelde - 3) x 1,5` punten. Bij beide bronnen valt een titel onder de twee sterren af, en vanaf 3,5 sterren sluit Bo het verhaaltje af met de sterren van die leerlingen. De eigen sterren gaan als `rating` mee in de geschiedenis naar het AI model.
 - **Meten of het helpt.** Elke getoonde tip wordt bewaard in `advice_suggestions`, niet als een docent het advies bekijkt. Met de bron op de leeslijst en de sterren berekent `adviceStatsService` hoeveel tips op een leeslijst komen, gelezen worden en hoe ze scoren, apart voor AI en regels.
 
 ## Game: XP en badges

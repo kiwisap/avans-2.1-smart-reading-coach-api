@@ -39,7 +39,14 @@ export function toProfileDto(profile: ReadingProfile | null): ProfileDto | null 
 }
 
 export function toBookDto(doc: WithId<Book>): BookDto {
-    const { _id, key: _key, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = doc;
+    const {
+        _id,
+        key: _key,
+        sources: _sources,
+        createdAt: _createdAt,
+        updatedAt: _updatedAt,
+        ...rest
+    } = doc;
     return { id: _id.toString(), ...rest };
 }
 

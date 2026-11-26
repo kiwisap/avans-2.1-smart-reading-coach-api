@@ -51,8 +51,8 @@ function makeProfile(overrides: Partial<ReadingProfile> = {}): ReadingProfile {
     };
 }
 
-const recommendation = (book: BookDto, summary: string): AiRecommendation => ({
-    cataloguscode: `CAT-${book.id}`,
+const recommendation = (book: BookDto, story: string): AiRecommendation => ({
+    catalogCode: `CAT-${book.id}`,
     key: keyOf(book),
     title: book.title,
     author: null,
@@ -60,8 +60,8 @@ const recommendation = (book: BookDto, summary: string): AiRecommendation => ({
     genre: 'fictie',
     level: '2F',
     score: 0.9,
-    reasons: [summary, 'Het niveau past bij jou.'],
-    summary,
+    reasons: [story, 'Het niveau past bij jou.'],
+    motivation: story,
 });
 
 interface SetupOptions {
@@ -70,6 +70,7 @@ interface SetupOptions {
     readingList?: ReadingListItem[];
     peers?: Record<string, PeerRating>;
     ratings?: Record<string, number>; // own stars per book id
+    synonyms?: Record<string, string[]>; // related themes per topic, as the AI service stores them
 }
 
 const listItem = (bookId: string, status: ReadingListItem['status']): ReadingListItem => ({
@@ -88,6 +89,7 @@ function setup({
     readingList = [],
     peers = {},
     ratings = {},
+    synonyms = {},
 }: SetupOptions = {}) {
     const bookRepository = {
         findCandidates: async ({ allowedLevels, topics, materialTypes }: CandidateQuery) =>
@@ -130,12 +132,17 @@ function setup({
             ),
         peerRatings: async () => new Map(Object.entries(peers)),
     };
+    const synonymRepository = {
+        relatedTo: async (terms: string[]) =>
+            new Map(terms.flatMap((term) => (synonyms[term] ? [[term, synonyms[term]]] : []))),
+    };
     const service = createAdviceService({
         profileRepository,
         bookRepository,
         readingListRepository,
         suggestionRepository,
         ratingRepository,
+        synonymRepository,
         aiClient,
     });
     return Object.assign(service, { shown });
@@ -150,6 +157,7 @@ function fakeAi(answer: AiRecommendation[] | null) {
             return answer;
         },
         isHealthy: async () => answer !== null,
+        retrain: async () => true,
     };
     return { client, calls };
 }
@@ -180,6 +188,17 @@ describe('adviceService with the rules', () => {
     it('never suggests a book that is too difficult', async () => {
         const { suggestions } = await setup().getAdvice('u1');
         assert.ok(!suggestions.some((suggestion) => suggestion.title === 'Moeilijk boek'));
+    });
+
+    it('also matches themes the AI service learned as related to a topic', async () => {
+        const profile = makeProfile({ topics: ['romantiek'] });
+        const { suggestions } = await setup({
+            profile,
+            synonyms: { romantiek: ['liefde'] },
+        }).getAdvice('u1');
+        assert.equal(suggestions[0]?.title, 'Liefdesboek');
+        // Bo talks about the topic the student chose, not about the related theme.
+        assert.match(suggestions[0]?.motivation ?? '', /romantiek/);
     });
 
     it('gives different advice for different profiles', async () => {
@@ -330,5 +349,6 @@ describe('adviceService with ratings of students like this one', () => {
             ['Humorboek', 'Oorlogsboek', 'Liefdesboek'],
         );
         assert.ok(suggestions[1]?.reasons.at(-1)?.includes('4,5'));
+        assert.match(suggestions[1]?.motivation ?? '', /^Het gaat over oorlog\. .*4,5/);
     });
 });
