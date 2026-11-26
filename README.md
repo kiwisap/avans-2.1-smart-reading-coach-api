@@ -18,7 +18,7 @@ Inhoud: [Techniek](#techniek) · [Lokaal draaien](#lokaal-draaien) · [Scripts](
 
 ## Lokaal draaien
 
-Je hebt Node.js 20.6 of hoger en Docker nodig.
+Je hebt Node.js 20.6 of hoger en Docker nodig. Voor AI advies moet ook de AI service draaien: die start je in zijn eigen project (`smart-reading-coach-ai`, zie de README daar).
 
 ```bash
 # 1. Afhankelijkheden installeren
@@ -39,20 +39,25 @@ npm run import:catalog
 npm run dev
 ```
 
-De API draait dan op `http://localhost:3000`. Controleer met `http://localhost:3000/api/health`: die meldt of PostgreSQL en MongoDB bereikbaar zijn.
+De API draait dan op `http://localhost:3000`. Controleer met `http://localhost:3000/api/health`: die meldt of PostgreSQL, MongoDB en de AI service bereikbaar zijn (`"ai": "ok"`).
+
+De AI service is een los project met een eigen `docker-compose.yml`. Zet in `.env` van allebei dezelfde `AI_API_KEY`. Zonder AI service werkt alles ook: het advies gebruikt dan de regels (`"ai": "unavailable"` of, als `AI_SERVICE_URL` leeg is, `"disabled"`).
 
 Start daarna de frontend (zie de README in `smart-reading-coach`).
 
 ### Instellingen (`.env`)
 
-| Variabele               | Betekenis                                                                    | Standaard               |
-| ----------------------- | ---------------------------------------------------------------------------- | ----------------------- |
-| `PORT`, `HOST`          | Waar de API luistert                                                         | `3000`, `0.0.0.0`       |
-| `CORS_ORIGIN`           | Adres van de frontend                                                        | `http://localhost:5173` |
-| `POSTGRES_URL`          | Verbinding met PostgreSQL                                                    | zie `.env.example`      |
-| `MONGO_URL`, `MONGO_DB` | Verbinding met MongoDB en de databasenaam                                    | zie `.env.example`      |
-| `JWT_SECRET`            | Geheim waarmee tokens worden ondertekend, kies een lange willekeurige waarde | verplicht               |
-| `JWT_EXPIRES_IN`        | Levensduur van een token                                                     | `8h`                    |
+| Variabele               | Betekenis                                                                     | Standaard               |
+| ----------------------- | ----------------------------------------------------------------------------- | ----------------------- |
+| `PORT`, `HOST`          | Waar de API luistert                                                          | `3000`, `0.0.0.0`       |
+| `CORS_ORIGIN`           | Adres van de frontend                                                         | `http://localhost:5173` |
+| `POSTGRES_URL`          | Verbinding met PostgreSQL                                                     | zie `.env.example`      |
+| `MONGO_URL`, `MONGO_DB` | Verbinding met MongoDB en de databasenaam                                     | zie `.env.example`      |
+| `JWT_SECRET`            | Geheim waarmee tokens worden ondertekend, kies een lange willekeurige waarde  | verplicht               |
+| `JWT_EXPIRES_IN`        | Levensduur van een token                                                      | `8h`                    |
+| `AI_SERVICE_URL`        | Adres van de AI service, leeg laten voor alleen regels                        | `http://localhost:8000` |
+| `AI_API_KEY`            | Gedeelde sleutel met de AI service (header `X-API-Key`), leeg is geen sleutel | leeg                    |
+| `AI_TIMEOUT_MS`         | Hoe lang de API op de AI service wacht voordat de regels het overnemen        | `3000`                  |
 
 Het bestand `.env` staat in `.gitignore` en wordt nooit gecommit.
 
@@ -103,19 +108,19 @@ src/
     repositories/        toegang tot de databases, geen bedrijfslogica
     entities/            typen van wat in de databases staat (User, ReadingProfile, ReadingListItem, Book)
     dto/                 typen van wat de API teruggeeft of ontvangt
-    advice/              scoring en motivatieteksten van het advies
+    advice/              client van de AI service, scoring en motivatieteksten van het advies
     catalog/             Excel importeren en rijen normaliseren
     profile/             toegestane waarden van het leesprofiel
     readingList/         statussen van de leeslijst
     auth/                rollen
     db/                  Drizzle schema, migratie en seed
-    plugins/             Fastify plugins: postgres, mongo, auth, locale, errorHandler
+    plugins/             Fastify plugins: postgres, mongo, ai, auth, locale, errorHandler
     openapi/             gedeelde schema's, documentatie-instellingen en de generator van openapi.json
     scripts/             losse commando's, zoals de catalogusimport
     types/               uitbreiding van de Fastify typen
 tests/                   unit tests
 drizzle/                 gegenereerde SQL migraties
-data/                    de catalogus als Excel bestand
+data/                    de catalogus als Excel bestand (de definitieve dataset, dezelfde als waarop het AI model traint)
 openapi.json             gegenereerde API specificatie (npm run openapi)
 ```
 
@@ -139,14 +144,16 @@ flowchart LR
 
     PG[("PostgreSQL<br/>users, profielen, leeslijst")]
     MG[("MongoDB<br/>catalogus: books")]
+    AI["AI service<br/>FastAPI, random forest"]
 
     FE -- "REST, JSON, Bearer token" --> R
     Rep -- "Drizzle ORM" --> PG
     Rep -- "MongoDB driver" --> MG
+    S -- "REST, X-API-Key" --> AI
     API -. "openapi.json" .-> FE
 ```
 
-De frontend praat alleen met de API. De API is de enige die de databases aanspreekt. De stippellijn is het contract: de API beschrijft zichzelf in `openapi.json` en de frontend genereert daar zijn types uit (zie OpenAPI hieronder).
+De frontend praat alleen met de API. De API is de enige die de databases en de AI service aanspreekt. De AI service krijgt alleen het leesprofiel en de keys van de titels op de leeslijst, geen naam, e-mail of id. De stippellijn is het contract: de API beschrijft zichzelf in `openapi.json` en de frontend genereert daar zijn types uit (zie OpenAPI hieronder).
 
 ### Lagen
 
@@ -275,15 +282,16 @@ Alle paden beginnen met `/api`.
 | `GET /books/:id`                                                    | ingelogd | Eén titel                                                                                                                                                    |
 | `GET /profile/options`                                              | leerling | Keuzes voor het leesprofiel                                                                                                                                  |
 | `GET /profile/me`, `PUT /profile/me`                                | leerling | Eigen leesprofiel lezen en opslaan                                                                                                                           |
-| `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie                                                                                                                       |
+| `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie en redenen, plus de bron (`ai` of `rules`)                                                                            |
 | `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                                                                                     |
 | `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                                                                                     |
 | `GET /teachers`                                                     | leerling | Docenten en of je aan ze gekoppeld bent                                                                                                                      |
 | `PUT /teachers/:teacherId/link`, `DELETE /teachers/:teacherId/link` | leerling | Koppelen en ontkoppelen                                                                                                                                      |
 | `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                                                                                        |
 | `GET /students/:studentId`                                          | docent   | Leesprofiel en leeslijst van een gekoppelde leerling                                                                                                         |
+| `GET /students/:studentId/advice`                                   | docent   | Het leesadvies van een gekoppelde leerling (hetzelfde als wat de leerling ziet)                                                                              |
 | `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                                                                                        |
-| `GET /health`                                                       | iedereen | Status van beide databases                                                                                                                                   |
+| `GET /health`                                                       | iedereen | Status van beide databases en de AI service                                                                                                                  |
 
 ### Foutantwoorden
 
@@ -316,12 +324,17 @@ Clients reageren op `status`, niet op de tekst. De codes hieronder zijn intern e
 
 ## Adviesalgoritme
 
-Het advies is regelgebaseerd en uitlegbaar. De logica staat in `advice/scoring.ts`, de gewichten in de constante `WEIGHTS`.
+Het advies komt van het AI model, met de regels als vangnet. De logica staat in `services/adviceService.ts`.
+
+1. **AI model.** De API stuurt het leesprofiel en de leeslijst (als catalogus keys) naar de AI service (`advice/aiClient.ts`). Het model in `smart-reading-coach-ai` combineert niveau, soort tekst, genre, leestijd, tekstovereenkomst met de onderwerpen en de smaak van vergelijkbare leerlingen, en geeft vijf titels met redenen terug. Titels die al op de leeslijst staan worden niet opnieuw aangeraden. De API zoekt de titels op in MongoDB via hun `key`. Het antwoord heeft `source: "ai"`.
+2. **Regels als vangnet.** Is `AI_SERVICE_URL` niet ingesteld, antwoordt de service niet binnen `AI_TIMEOUT_MS`, geeft hij een fout of staan er minder dan drie van de titels in de catalogus, dan gebruikt de API de regels. Het antwoord heeft dan `source: "rules"`.
+
+De regels (`advice/scoring.ts`, gewichten in `WEIGHTS`):
 
 1. Titels die moeilijker zijn dan het niveau van de leerling vallen af.
 2. Elke overgebleven titel krijgt punten: niveau exact (3), makkelijker niveau (1), per overeenkomend onderwerp (3), gewenste soort tekst (2), passende lengte (1) en passend bij het leesdoel (1). De catalogus heeft geen aantal bladzijden, dus de lengte wordt geschat op basis van de soort tekst.
 3. De hoogste scores worden aangeboden, maximaal vijf. Zijn er te weinig treffers, dan wordt de selectie verbreed naar alles op het niveau van de leerling, zodat er altijd minstens drie suggesties zijn.
-4. De tekst "Waarom dit bij je past" (`advice/motivation.ts`) wordt alleen opgebouwd uit de redenen die echt overeenkwamen.
+4. De redenen "Waarom dit bij je past" (`advice/motivation.ts`) worden alleen opgebouwd uit wat echt overeenkwam.
 
 ## Tests
 
@@ -331,17 +344,18 @@ npm test
 
 De unit tests dekken de kernlogica, zonder database:
 
-| Bestand                      | Wat wordt getest                                                                                                                                                             |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scoring.test.ts`            | Puntentelling, te moeilijke titels, motivatietekst en het randgeval van een titel zonder niveau                                                                              |
-| `adviceService.test.ts`      | Eerst een profiel invullen, beste treffer bovenaan, minstens drie suggesties, nooit een te moeilijke titel                                                                   |
-| `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                                                   |
-| `readingListService.test.ts` | Toevoegen, dubbele of onbekende titels, sortering, verwijderde catalogustitels, niet bij andermans item kunnen, gelezen of ongelezen zetten                                  |
-| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar, koppelen en ontkoppelen van docenten                                                                              |
-| `errorHandler.test.ts`       | Foutantwoorden als problem details in de taal van het verzoek, ongeldige invoer, onbekende route, geen technische details bij een crash                                      |
-| `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten                                                |
-| `openapi.test.ts`            | Elke route staat in de specificatie met tag, samenvatting en beveiliging, `openapi.json` is actueel, DTO's en antwoorden passen bij de schema's, fouten zijn problem details |
-| `normalizeRow.test.ts`       | Het omzetten en opschonen van rijen uit de Excel catalogus, inclusief waarschuwingen bij ontbrekende gegevens                                                                |
+| Bestand                      | Wat wordt getest                                                                                                                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scoring.test.ts`            | Puntentelling, te moeilijke titels, motivatietekst en het randgeval van een titel zonder niveau                                                                                                          |
+| `adviceService.test.ts`      | Eerst een profiel invullen, beste treffer bovenaan, minstens drie suggesties, nooit een te moeilijke titel, AI advies in de volgorde van het model, leeslijst als geschiedenis, terugvallen op de regels |
+| `aiClient.test.ts`           | Verzoek naar de AI service (profiel, geschiedenis, API sleutel), null bij een fout, time out of vreemd antwoord, health check                                                                            |
+| `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                                                                               |
+| `readingListService.test.ts` | Toevoegen, dubbele of onbekende titels, sortering, verwijderde catalogustitels, niet bij andermans item kunnen, gelezen of ongelezen zetten                                                              |
+| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar (ook hun advies), koppelen en ontkoppelen van docenten                                                                                         |
+| `errorHandler.test.ts`       | Foutantwoorden als problem details in de taal van het verzoek, ongeldige invoer, onbekende route, geen technische details bij een crash                                                                  |
+| `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten                                                                            |
+| `openapi.test.ts`            | Elke route staat in de specificatie met tag, samenvatting en beveiliging, `openapi.json` is actueel, DTO's en antwoorden passen bij de schema's, fouten zijn problem details                             |
+| `normalizeRow.test.ts`       | Het omzetten en opschonen van rijen uit de Excel catalogus, inclusief waarschuwingen bij ontbrekende gegevens                                                                                            |
 
 ## CI/CD en deployment
 
@@ -361,10 +375,11 @@ Maak in de branch protection van `main` de checks `Build, lint and test` en `Dep
 | ---------- | ---------------------------- | ----------------------------------------------------------------------------------- |
 | API        | Render, web service (Docker) | Gratis, bouwt de `Dockerfile` en wordt beschreven in `render.yaml`.                 |
 | Website    | Render, static site          | Gratis en slaapt nooit. Zie de `render.yaml` van de frontend.                       |
+| AI service | Render, web service (Docker) | Gratis, eigen repository `smart-reading-coach-ai` met een eigen `render.yaml`.      |
 | PostgreSQL | Neon                         | Blijvend gratis (1 GB). De gratis database van Render wordt na 30 dagen verwijderd. |
 | MongoDB    | MongoDB Atlas (M0)           | Blijvend gratis (512 MB).                                                           |
 
-De gratis API slaapt na 15 minuten zonder verkeer en heeft ongeveer een minuut nodig om wakker te worden. Het eerste verzoek na een pauze is dus traag. Neon wordt ook na een paar minuten stilgezet en start automatisch weer op.
+De gratis API slaapt na 15 minuten zonder verkeer en heeft ongeveer een minuut nodig om wakker te worden. Het eerste verzoek na een pauze is dus traag. Voor de AI service geldt hetzelfde: de API stuurt bij het opstarten een ping om hem te wekken, en zolang hij nog slaapt geven de regels het advies. Neon wordt ook na een paar minuten stilgezet en start automatisch weer op.
 
 ### Eenmalig inrichten
 
@@ -383,6 +398,7 @@ De gratis API slaapt na 15 minuten zonder verkeer en heeft ongeveer een minuut n
     ```
     Omgevingsvariabelen gaan voor op `.env`, dus je `.env` hoef je niet aan te passen. Het seed script maakt de demo accounts aan, ook het docentaccount. Verander de wachtwoorden als je de website deelt.
 8. **Deploy.** Push naar `main` of start de workflow handmatig onder Actions. Daarna is elke push naar `main` met groene checks automatisch live.
+9. **AI service koppelen.** Zet de AI service live (zie de README van `smart-reading-coach-ai`). Vul daarna in deze service onder Environment `AI_SERVICE_URL` (bijvoorbeeld `https://smart-reading-coach-ai.onrender.com`) en `AI_API_KEY` (dezelfde waarde als in de AI service) in. Importeer de catalogus opnieuw met stap 7 (`npm run import:catalog`), zodat de titels in Atlas dezelfde keys hebben als het model. `/api/health` meldt daarna `"ai": "ok"`.
 
 ### Docker
 
@@ -434,5 +450,6 @@ Voorbeeld: een extra leesdoel toevoegen, bijvoorbeeld `culture`.
 
 ## Bekende beperkingen
 
-- Het advies is nog regelgebaseerd. Een AI model volgt in een latere fase.
+- Het AI model is getraind op een deels gesimuleerde dataset. De regels blijven als vangnet.
+- De uitleg van het AI advies komt in het Nederlands uit de AI service, nog niet via `locales/`.
 - Er zijn unit tests, maar nog geen integratietests tegen een echte database.

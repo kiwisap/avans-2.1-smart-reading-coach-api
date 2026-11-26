@@ -8,7 +8,7 @@ import { registerDocs } from './docs.js';
 
 // An object that accepts any property access and any call and returns itself.
 // It stands in for the database connections, so the routes can be registered (and described)
-// without PostgreSQL or MongoDB. No request that reaches a database is ever sent to it.
+// without PostgreSQL, MongoDB or the AI service. No request that reaches a database is ever sent to it.
 function inert(): unknown {
     const proxy: unknown = new Proxy(function () {}, {
         get: (_target, property) => (property === 'then' ? undefined : proxy),
@@ -21,6 +21,7 @@ const withoutDatabases = fp(async (fastify) => {
     fastify.decorate('pg', inert() as never);
     fastify.decorate('db', inert() as never);
     fastify.decorate('mongo', inert() as never);
+    fastify.decorate('ai', null);
 });
 
 // A Fastify app with all routes and plugins, but without database connections.

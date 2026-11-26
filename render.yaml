@@ -25,3 +25,12 @@ services:
             sync: false
           - key: CORS_ORIGIN # address of the website, for example https://smart-reading-coach.onrender.com
             sync: false
+          # The AI service is a separate Render service (repo smart-reading-coach-ai). Leave
+          # AI_SERVICE_URL empty to use the rule based advice only.
+          - key: AI_SERVICE_URL # for example https://smart-reading-coach-ai.onrender.com
+            sync: false
+          - key: AI_API_KEY # the same value as AI_API_KEY of the AI service
+            sync: false
+          # A sleeping AI service needs time to wake up; until then the rules give the advice.
+          - key: AI_TIMEOUT_MS
+            value: '5000'

@@ -15,4 +15,8 @@ export const config = {
     mongoDb: process.env.MONGO_DB ?? 'smart_reading_coach_files',
     jwtSecret: requireEnv('JWT_SECRET'),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
+    // Optional AI service (smart-reading-coach-ai). Without a url the advice uses the rules only.
+    aiServiceUrl: process.env.AI_SERVICE_URL || null,
+    aiApiKey: process.env.AI_API_KEY || null,
+    aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS ?? 3000),
 };

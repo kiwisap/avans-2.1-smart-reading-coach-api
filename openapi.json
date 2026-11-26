@@ -235,7 +235,8 @@
                     "levels",
                     "levelLabel",
                     "url",
-                    "motivation"
+                    "motivation",
+                    "reasons"
                 ],
                 "properties": {
                     "id": {
@@ -296,7 +297,42 @@
                     },
                     "motivation": {
                         "type": "string",
-                        "description": "Why this title fits the reading profile."
+                        "description": "Why this title fits the reading profile, in one short sentence."
+                    },
+                    "reasons": {
+                        "type": "array",
+                        "description": "All reasons why this title fits, most important first.",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "AdviceSource": {
+                "type": "string",
+                "enum": [
+                    "ai",
+                    "rules"
+                ],
+                "description": "ai: the advice comes from the AI model. rules: the AI service was not available, the rule based scoring was used."
+            },
+            "Advice": {
+                "type": "object",
+                "description": "Reading advice for a student.",
+                "required": [
+                    "source",
+                    "suggestions"
+                ],
+                "properties": {
+                    "source": {
+                        "$ref": "#/components/schemas/AdviceSource"
+                    },
+                    "suggestions": {
+                        "type": "array",
+                        "description": "Recommended titles, best match first.",
+                        "items": {
+                            "$ref": "#/components/schemas/Suggestion"
+                        }
                     }
                 }
             },
@@ -655,7 +691,8 @@
                 "required": [
                     "status",
                     "postgres",
-                    "mongo"
+                    "mongo",
+                    "ai"
                 ],
                 "properties": {
                     "status": {
@@ -669,6 +706,15 @@
                     "mongo": {
                         "type": "boolean",
                         "description": "MongoDB answered the ping."
+                    },
+                    "ai": {
+                        "type": "string",
+                        "enum": [
+                            "ok",
+                            "unavailable",
+                            "disabled"
+                        ],
+                        "description": "ok: the AI service answers and has a model. unavailable: it is configured but does not answer, the advice uses the rules. disabled: AI_SERVICE_URL is not set."
                     }
                 }
             }
@@ -677,7 +723,7 @@
     "paths": {
         "/api/health": {
             "get": {
-                "summary": "Check that the API and both databases respond",
+                "summary": "Check that the API, both databases and the AI service respond",
                 "tags": [
                     "System"
                 ],
@@ -1004,6 +1050,94 @@
                     },
                     "404": {
                         "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/students/{studentId}/advice": {
+            "get": {
+                "summary": "See the reading advice of one student",
+                "tags": [
+                    "Students"
+                ],
+                "description": "The same advice the student sees on the advice page. Only for students who linked this teacher.",
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "in": "path",
+                        "name": "studentId",
+                        "required": true,
+                        "description": "Student id."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Recommended books for the student and where the advice comes from.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Advice"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict with the current state.",
                         "content": {
                             "application/problem+json": {
                                 "schema": {
@@ -1543,7 +1677,7 @@
                 "tags": [
                     "Advice"
                 ],
-                "description": "Based on the saved reading profile. Each suggestion explains why it was recommended.",
+                "description": "Based on the saved reading profile and the reading list. The AI model gives the advice when the AI service is available, otherwise the rule based scoring does. Each suggestion explains why it was recommended.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -1551,23 +1685,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Recommended books, best match first.",
+                        "description": "Recommended books, best match first, and where the advice comes from.",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "description": "Recommended books, best match first.",
-                                    "type": "object",
-                                    "required": [
-                                        "suggestions"
-                                    ],
-                                    "properties": {
-                                        "suggestions": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/Suggestion"
-                                            }
-                                        }
-                                    }
+                                    "$ref": "#/components/schemas/Advice"
                                 }
                             }
                         }

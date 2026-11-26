@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import { problems, secured, wrap } from '../openapi/helpers.js';
+import { ok, problems, secured, wrap } from '../openapi/helpers.js';
 import { createBookRepository } from '../repositories/bookRepository.js';
 import { createProfileRepository } from '../repositories/profileRepository.js';
 import { createReadingListRepository } from '../repositories/readingListRepository.js';
 import { createUserRepository } from '../repositories/userRepository.js';
+import { createAdviceService } from '../services/adviceService.js';
 import { createReadingListService } from '../services/readingListService.js';
 import { createTeacherService } from '../services/teacherService.js';
 
@@ -35,6 +36,19 @@ const overviewSchema = {
     },
 };
 
+const adviceSchema = {
+    tags: ['Students'],
+    summary: 'See the reading advice of one student',
+    description:
+        'The same advice the student sees on the advice page. Only for students who linked this teacher.',
+    security: secured,
+    params: studentParams,
+    response: {
+        200: ok('Advice', 'Recommended books for the student and where the advice comes from.'),
+        ...problems(400, 401, 403, 404, 409),
+    },
+};
+
 const addTitleSchema = {
     tags: ['Students'],
     summary: 'Add a book to the reading list of a student',
@@ -53,14 +67,21 @@ const addTitleSchema = {
 };
 
 export default async function studentRoutes(fastify: FastifyInstance): Promise<void> {
-    const readingListService = createReadingListService({
-        readingListRepository: createReadingListRepository(fastify.db),
-        bookRepository: createBookRepository(fastify.mongo.db),
+    const bookRepository = createBookRepository(fastify.mongo.db);
+    const profileRepository = createProfileRepository(fastify.db);
+    const readingListRepository = createReadingListRepository(fastify.db);
+    const readingListService = createReadingListService({ readingListRepository, bookRepository });
+    const adviceService = createAdviceService({
+        profileRepository,
+        bookRepository,
+        readingListRepository,
+        aiClient: fastify.ai,
     });
     const teacherService = createTeacherService({
         userRepository: createUserRepository(fastify.db),
-        profileRepository: createProfileRepository(fastify.db),
+        profileRepository,
         readingListService,
+        adviceService,
     });
 
     // Teachers only. Access to a specific student is checked again in the service.
@@ -75,6 +96,17 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
         { preHandler, schema: overviewSchema },
         async (request) =>
             teacherService.getStudentOverview(request.user.sub, request.params.studentId),
+    );
+
+    fastify.get<{ Params: { studentId: string } }>(
+        '/students/:studentId/advice',
+        { preHandler, schema: adviceSchema },
+        async (request) =>
+            teacherService.getStudentAdvice(
+                request.user.sub,
+                request.params.studentId,
+                request.locale,
+            ),
     );
 
     fastify.post<{ Params: { studentId: string }; Body: { bookId: string } }>(

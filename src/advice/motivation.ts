@@ -5,12 +5,12 @@ import type { MatchReasons } from './scoring.js';
 
 // "Waarom dit bij je past": alleen opgebouwd uit de redenen die echt overeenkomen.
 // The texts live in src/locales/nl.json, under "advice".
-export function buildMotivation(
+export function buildReasons(
     profile: ProfileData,
     book: Pick<BookDto, 'type'>,
     reasons: MatchReasons,
     locale: Locale = DEFAULT_LOCALE,
-): string {
+): string[] {
     const parts: string[] = [];
 
     if (reasons.topics.length > 0) {
@@ -47,10 +47,21 @@ export function buildMotivation(
         );
     }
     if (reasons.goal) {
-        parts.push(tOr('advice.goals', profile.readingGoal, '', locale));
+        const goal = tOr('advice.goals', profile.readingGoal, '', locale);
+        if (goal) parts.push(goal);
     }
 
-    return parts.length > 0 ? parts.join(' ') : t('advice.motivation.fallback', undefined, locale);
+    return parts.length > 0 ? parts : [t('advice.motivation.fallback', undefined, locale)];
+}
+
+// The reasons as one text, for places that show a single sentence.
+export function buildMotivation(
+    profile: ProfileData,
+    book: Pick<BookDto, 'type'>,
+    reasons: MatchReasons,
+    locale: Locale = DEFAULT_LOCALE,
+): string {
+    return buildReasons(profile, book, reasons, locale).join(' ');
 }
 
 // Niet elk item in de catalogus heeft een beschrijving (artikelen en poëzie hebben alleen thema's).

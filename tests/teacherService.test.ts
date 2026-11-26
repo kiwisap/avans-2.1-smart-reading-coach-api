@@ -75,12 +75,22 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
         },
     };
 
+    const adviceRequests: string[] = [];
+    const adviceService = {
+        getAdvice: async (studentId: string) => {
+            adviceRequests.push(studentId);
+            return { source: 'rules' as const, suggestions: [] };
+        },
+    };
+
     return {
         teacherService: createTeacherService({
             userRepository,
             profileRepository,
             readingListService,
+            adviceService,
         }),
+        adviceRequests,
         linkService: createTeacherLinkService({ userRepository }),
         added,
         linkSet,
@@ -104,6 +114,22 @@ describe('teacherService', () => {
             teacherService.getStudentOverview('t2', 's1'),
             (err: unknown) => statusOf(err) === 403,
         );
+    });
+
+    it('shows the advice of a linked student', async () => {
+        const { teacherService, adviceRequests } = setup();
+        const advice = await teacherService.getStudentAdvice('t1', 's1');
+        assert.equal(advice.source, 'rules');
+        assert.deepEqual(adviceRequests, ['s1']);
+    });
+
+    it('does not show the advice of a student who is not linked', async () => {
+        const { teacherService, adviceRequests } = setup();
+        await assert.rejects(
+            teacherService.getStudentAdvice('t2', 's1'),
+            (err: unknown) => statusOf(err) === 403,
+        );
+        assert.equal(adviceRequests.length, 0);
     });
 
     it("lets a teacher add a title to a linked student's list", async () => {

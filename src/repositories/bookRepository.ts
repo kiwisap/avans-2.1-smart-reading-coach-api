@@ -115,6 +115,25 @@ export function createBookRepository(db: Db) {
             return docs.map(toBookDto);
         },
 
+        // The AI service identifies titles by their key (normalized title, author and type).
+        async findByKeys(keys: string[]): Promise<Map<string, BookDto>> {
+            if (keys.length === 0) return new Map();
+            const docs = await books.find({ key: { $in: keys } }).toArray();
+            return new Map(docs.map((doc) => [doc.key, toBookDto(doc)]));
+        },
+
+        // Key per catalog id, to tell the AI service which titles are already on a reading list.
+        async findKeysByIds(ids: string[]): Promise<Map<string, string>> {
+            const objectIds = ids
+                .filter((id) => ObjectId.isValid(id))
+                .map((id) => new ObjectId(id));
+            if (objectIds.length === 0) return new Map();
+            const docs = await books
+                .find({ _id: { $in: objectIds } }, { projection: { key: 1 } })
+                .toArray();
+            return new Map(docs.map((doc) => [doc._id.toString(), doc.key]));
+        },
+
         async findById(id: string): Promise<BookDto | null> {
             if (!ObjectId.isValid(id)) return null;
             const doc = await books.findOne({ _id: new ObjectId(id) });

@@ -1,7 +1,10 @@
 import { HttpError } from '../errors.js';
+import type { AdviceDto } from '../dto/adviceDto.js';
+import type { Locale } from '../i18n.js';
 import type { ReadingListItemDto } from '../dto/readingListItemDto.js';
 import type { StudentOverviewDto } from '../dto/studentOverviewDto.js';
 import { toProfileDto } from './mappingService.js';
+import type { AdviceService } from './adviceService.js';
 import type { ReadingListService } from './readingListService.js';
 import type { ProfileRepository } from '../repositories/profileRepository.js';
 import type { UserRepository } from '../repositories/userRepository.js';
@@ -10,6 +13,7 @@ interface Deps {
     userRepository: Pick<UserRepository, 'isLinked' | 'findById' | 'findStudentsOfTeacher'>;
     profileRepository: Pick<ProfileRepository, 'findByUserId'>;
     readingListService: Pick<ReadingListService, 'list' | 'add'>;
+    adviceService: Pick<AdviceService, 'getAdvice'>;
 }
 
 // What a teacher may do with the students linked to them (FR6).
@@ -17,6 +21,7 @@ export function createTeacherService({
     userRepository,
     profileRepository,
     readingListService,
+    adviceService,
 }: Deps) {
     // Every student specific action goes through this check, so a teacher only ever sees linked students.
     async function assertLinked(teacherId: string, studentId: string): Promise<void> {
@@ -47,6 +52,16 @@ export function createTeacherService({
                 profile: toProfileDto(profile),
                 readingList,
             };
+        },
+
+        // The teacher sees the same advice as the student, so they can talk about it together.
+        async getStudentAdvice(
+            teacherId: string,
+            studentId: string,
+            locale?: Locale,
+        ): Promise<AdviceDto> {
+            await assertLinked(teacherId, studentId);
+            return adviceService.getAdvice(studentId, locale);
         },
 
         async addToStudentReadingList(

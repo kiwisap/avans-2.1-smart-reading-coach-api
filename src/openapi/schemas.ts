@@ -7,6 +7,7 @@ import {
     MAX_TOPICS,
     READING_GOALS,
 } from '../profile/profileOptions.js';
+import { ADVICE_SOURCES } from '../advice/sources.js';
 import { READING_STATUSES } from '../readingList/statuses.js';
 
 // Shared JSON schemas. Each one has an $id, so routes can point to it with { $ref: 'Name#' }.
@@ -140,10 +141,33 @@ export const sharedSchemas = [
         $id: 'Suggestion',
         type: 'object',
         description: 'A recommended book with the reason why it was recommended.',
-        required: [...bookRequired, 'motivation'],
+        required: [...bookRequired, 'motivation', 'reasons'],
         properties: {
             ...bookProperties,
-            motivation: text('Why this title fits the reading profile.'),
+            motivation: text('Why this title fits the reading profile, in one short sentence.'),
+            reasons: stringList('All reasons why this title fits, most important first.'),
+        },
+    },
+    {
+        $id: 'AdviceSource',
+        type: 'string',
+        enum: [...ADVICE_SOURCES],
+        description:
+            'ai: the advice comes from the AI model. rules: the AI service was not available, the ' +
+            'rule based scoring was used.',
+    },
+    {
+        $id: 'Advice',
+        type: 'object',
+        description: 'Reading advice for a student.',
+        required: ['source', 'suggestions'],
+        properties: {
+            source: { $ref: 'AdviceSource#' },
+            suggestions: {
+                type: 'array',
+                description: 'Recommended titles, best match first.',
+                items: { $ref: 'Suggestion#' },
+            },
         },
     },
     {
@@ -261,11 +285,18 @@ export const sharedSchemas = [
     {
         $id: 'Health',
         type: 'object',
-        required: ['status', 'postgres', 'mongo'],
+        required: ['status', 'postgres', 'mongo', 'ai'],
         properties: {
             status: text('ok when the API runs.'),
             postgres: { type: 'boolean', description: 'PostgreSQL answered the ping.' },
             mongo: { type: 'boolean', description: 'MongoDB answered the ping.' },
+            ai: {
+                type: 'string',
+                enum: ['ok', 'unavailable', 'disabled'],
+                description:
+                    'ok: the AI service answers and has a model. unavailable: it is configured but ' +
+                    'does not answer, the advice uses the rules. disabled: AI_SERVICE_URL is not set.',
+            },
         },
     },
 ] as const;

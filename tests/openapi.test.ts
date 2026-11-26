@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import { Ajv } from 'ajv';
 import addFormatsModule from 'ajv-formats';
+import type { AdviceDto } from '../src/dto/adviceDto.js';
 import type { BookDto } from '../src/dto/bookDto.js';
 import type { ReadingListItemDto } from '../src/dto/readingListItemDto.js';
 import type { StudentOverviewDto } from '../src/dto/studentOverviewDto.js';
@@ -126,10 +127,16 @@ describe('DTOs follow the schemas', () => {
         role: 'student',
     };
 
-    it('accepts a book, a suggestion and a user', () => {
+    it('accepts a book, a suggestion, an advice and a user', () => {
         assertValid('Book', book);
-        const suggestion: SuggestionDto = { ...book, motivation: 'Past bij je niveau.' };
+        const suggestion: SuggestionDto = {
+            ...book,
+            motivation: 'Past bij je niveau.',
+            reasons: ['Past bij je niveau.'],
+        };
         assertValid('Suggestion', suggestion);
+        const advice: AdviceDto = { source: 'ai', suggestions: [suggestion] };
+        assertValid('Advice', advice);
         assertValid('User', user);
         assertValid('AuthResponse', { token: 'x.y.z', user });
     });
@@ -258,9 +265,15 @@ describe('response serialization', () => {
         );
     });
 
-    it('keeps a suggestion with its motivation', async () => {
-        const suggestion: SuggestionDto = { ...book, motivation: 'Past bij je niveau.' };
+    it('keeps a suggestion with its motivation and reasons', async () => {
+        const suggestion: SuggestionDto = {
+            ...book,
+            motivation: 'Past bij je niveau.',
+            reasons: ['Past bij je niveau.', 'Het gaat over vriendschap.'],
+        };
         assert.deepEqual(await serialize('Suggestion', suggestion), suggestion);
+        const advice: AdviceDto = { source: 'rules', suggestions: [suggestion] };
+        assert.deepEqual(await serialize('Advice', advice), advice);
     });
 
     it('keeps a student overview with and without a profile', async () => {

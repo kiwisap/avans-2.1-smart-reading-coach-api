@@ -1,5 +1,6 @@
 import type { GridFSBucket, Db, MongoClient } from 'mongodb';
 import type pg from 'pg';
+import type { AiClient } from '../advice/aiClient.js';
 import type { UserRole } from '../auth/roles.js';
 import type { Database } from '../db/types.js';
 import type { Locale } from '../i18n.js';
@@ -10,6 +11,7 @@ declare module 'fastify' {
         pg: pg.Pool;
         db: Database;
         mongo: { client: MongoClient; db: Db; files: GridFSBucket };
+        ai: AiClient | null;
         authenticate: (request: FastifyRequest) => Promise<void>;
         authorize: (...roles: UserRole[]) => (request: FastifyRequest) => Promise<void>;
     }

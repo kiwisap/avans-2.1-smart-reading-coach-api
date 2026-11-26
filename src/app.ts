@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { config } from './config.js';
+import ai from './plugins/ai.js';
 import postgres from './plugins/postgres.js';
 import mongo from './plugins/mongo.js';
 import auth from './plugins/auth.js';
@@ -21,6 +22,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     await app.register(postgres, { connectionString: config.postgresUrl });
     await app.register(mongo, { url: config.mongoUrl, dbName: config.mongoDb });
     await app.register(auth, { secret: config.jwtSecret, expiresIn: config.jwtExpiresIn });
+    await app.register(ai, {
+        baseUrl: config.aiServiceUrl,
+        apiKey: config.aiApiKey,
+        timeoutMs: config.aiTimeoutMs,
+    });
 
     // API documentation: Swagger UI on /api/docs, built from the same schemas the routes use.
     await registerDocs(app, { ui: true });
