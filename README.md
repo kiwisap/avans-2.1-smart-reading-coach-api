@@ -269,7 +269,7 @@ Wijzig je een route of schema, draai dan `npm run openapi` en commit `openapi.js
 - Inloggen levert een JWT met het gebruikers id (`sub`) en de rol.
 - Elke route behalve registreren, inloggen en de health check vraagt een geldig token via `fastify.authenticate`.
 - Routes die alleen voor één rol zijn, gebruiken `fastify.authorize('student')` of `fastify.authorize('teacher')`.
-- Een docent ziet alleen leerlingen die zichzelf aan die docent hebben gekoppeld. Dat wordt in `teacherService` afgedwongen en geeft anders een 403.
+- Een docent koppelt zichzelf aan een leerling en ziet alleen leerlingen aan wie hij gekoppeld is. Dat wordt in `teacherService` afgedwongen en geeft anders een 403.
 
 ## API overzicht
 
@@ -291,9 +291,10 @@ Alle paden beginnen met `/api`.
 | `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie en redenen, plus de bron (`ai` of `rules`)                                                                            |
 | `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                                                                                     |
 | `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                                                                                     |
-| `GET /teachers`                                                     | leerling | Docenten en of je aan ze gekoppeld bent                                                                                                                      |
-| `PUT /teachers/:teacherId/link`, `DELETE /teachers/:teacherId/link` | leerling | Koppelen en ontkoppelen                                                                                                                                      |
+| `GET /teachers`                                                     | leerling | Docenten die aan jou gekoppeld zijn (alleen bekijken)                                                                                                        |
 | `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                                                                                        |
+| `GET /students/search?search=`                                      | docent   | Leerlingen zoeken op naam of e-mailadres (minimaal 2 tekens, maximaal 20 resultaten), met of je al gekoppeld bent                                            |
+| `PUT /students/:studentId/link`, `DELETE /students/:studentId/link` | docent   | Jezelf aan een leerling koppelen en weer ontkoppelen                                                                                                         |
 | `GET /students/:studentId`                                          | docent   | Leesprofiel en leeslijst van een gekoppelde leerling                                                                                                         |
 | `GET /students/:studentId/advice`                                   | docent   | Het leesadvies van een gekoppelde leerling (hetzelfde als wat de leerling ziet)                                                                              |
 | `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                                                                                        |
@@ -323,7 +324,7 @@ Clients reageren op `status`, niet op de tekst. De codes hieronder zijn intern e
 | `advice.profileRequired`                                                        | 409           | Eerst het leesprofiel invullen                                                         |
 | `profile.tooManyTopics` (`max`), `profile.unknownTopics` (`topics`)             | 400           | Te veel of onbekende onderwerpen                                                       |
 | `readingList.bookNotInCatalog`, `alreadyOnList`, `itemNotFound`                 | 404, 409, 404 | Titel onbekend, al op de lijst, item niet gevonden                                     |
-| `teachers.notFound`, `students.notLinked`, `students.notFound`                  | 404, 403, 404 | Docent of leerling onbekend, leerling niet gekoppeld                                   |
+| `students.notLinked`, `students.notFound`                                       | 403, 404      | Leerling niet gekoppeld, leerling onbekend                                             |
 | `validation.required` (`field`), `invalidFormat`, `empty`, `tooLong`, `invalid` | 400           | Ongeldige invoer, `field` is de naam van het veld in het verzoek, bijvoorbeeld `email` |
 | `validation.invalidEmail`, `validation.passwordTooShort` (`min`)                | 400           | Ongeldig e-mailadres, te kort wachtwoord                                               |
 | `generic.badRequest`, `generic.notFound`, `generic.server`                      | 400, 404, 500 | Kapot verzoek, onbekende route, onverwachte fout (zonder technische details)           |
@@ -358,7 +359,7 @@ De unit tests dekken de kernlogica, zonder database:
 | `aiClient.test.ts`           | Verzoek naar de AI service (profiel, geschiedenis, API sleutel), null bij een fout, time out of vreemd antwoord, health check                                                                            |
 | `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                                                                               |
 | `readingListService.test.ts` | Toevoegen, dubbele of onbekende titels, sortering, verwijderde catalogustitels, niet bij andermans item kunnen, gelezen of ongelezen zetten                                                              |
-| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar (ook hun advies), koppelen en ontkoppelen van docenten                                                                                         |
+| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar (ook hun advies), docenten koppelen zichzelf aan leerlingen en zoeken alleen leerlingen                                                        |
 | `errorHandler.test.ts`       | Foutantwoorden als problem details in de taal van het verzoek, ongeldige invoer, onbekende route, geen technische details bij een crash                                                                  |
 | `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten                                                                            |
 | `openapi.test.ts`            | Elke route staat in de specificatie met tag, samenvatting en beveiliging, `openapi.json` is actueel, DTO's en antwoorden passen bij de schema's, fouten zijn problem details                             |

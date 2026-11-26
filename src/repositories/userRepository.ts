@@ -1,9 +1,14 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, ilike, or, sql } from 'drizzle-orm';
 import { readingProfiles, teacherStudents, users } from '../db/schema.js';
 import type { User } from '../entities/user.js';
 import type { Database } from '../db/types.js';
 import { cleanInfix, fullName } from '../auth/fullName.js';
 import type { UserRole } from '../auth/roles.js';
+
+// Characters with a meaning in LIKE patterns are searched for literally.
+function escapeLike(text: string): string {
+    return text.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
 
 export interface NewUser {
     email: string;
@@ -123,24 +128,43 @@ export function createUserRepository(db: Database) {
                 );
         },
 
-        // All teachers, plus whether this student is already linked to each one.
-        async findTeachersForStudent(studentId: string) {
+        // The teachers who follow a student.
+        async findTeachersOfStudent(studentId: string) {
+            return db
+                .select({ id: users.id, name: users.name, email: users.email })
+                .from(teacherStudents)
+                .innerJoin(users, eq(teacherStudents.teacherId, users.id))
+                .where(eq(teacherStudents.studentId, studentId))
+                .orderBy(users.name);
+        },
+
+        // Students whose name or email address contains the query, plus whether this teacher
+        // already follows each one.
+        async searchStudents(teacherId: string, query: string, limit: number) {
+            const pattern = `%${escapeLike(query)}%`;
             return db
                 .select({
                     id: users.id,
                     name: users.name,
+                    email: users.email,
                     linked: sql<boolean>`${teacherStudents.studentId} IS NOT NULL`.mapWith(Boolean),
                 })
                 .from(users)
                 .leftJoin(
                     teacherStudents,
                     and(
-                        eq(teacherStudents.teacherId, users.id),
-                        eq(teacherStudents.studentId, studentId),
+                        eq(teacherStudents.studentId, users.id),
+                        eq(teacherStudents.teacherId, teacherId),
                     ),
                 )
-                .where(eq(users.role, 'teacher'))
-                .orderBy(users.name);
+                .where(
+                    and(
+                        eq(users.role, 'student'),
+                        or(ilike(users.name, pattern), ilike(users.email, pattern)),
+                    ),
+                )
+                .orderBy(users.name)
+                .limit(limit);
         },
     };
 }

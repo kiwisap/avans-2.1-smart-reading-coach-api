@@ -596,12 +596,12 @@
                     }
                 }
             },
-            "TeacherLink": {
+            "LinkedTeacher": {
                 "type": "object",
                 "required": [
                     "id",
                     "name",
-                    "linked"
+                    "email"
                 ],
                 "properties": {
                     "id": {
@@ -613,9 +613,39 @@
                         "type": "string",
                         "description": "Teacher name."
                     },
+                    "email": {
+                        "type": "string",
+                        "description": "Teacher email address.",
+                        "format": "email"
+                    }
+                }
+            },
+            "StudentLink": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "linked"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Student id.",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Student name."
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Student email address.",
+                        "format": "email"
+                    },
                     "linked": {
                         "type": "boolean",
-                        "description": "Whether this teacher can see the student."
+                        "description": "Whether this teacher follows the student."
                     }
                 }
             },
@@ -1184,7 +1214,7 @@
         },
         "/api/students": {
             "get": {
-                "summary": "List the students that linked this teacher",
+                "summary": "List the students this teacher follows",
                 "tags": [
                     "Students"
                 ],
@@ -1239,13 +1269,264 @@
                 }
             }
         },
+        "/api/students/search": {
+            "get": {
+                "summary": "Search students to link to the logged in teacher",
+                "tags": [
+                    "Students"
+                ],
+                "description": "Searches name and email address. At most 20 results.",
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 100
+                        },
+                        "in": "query",
+                        "name": "search",
+                        "required": true,
+                        "description": "Part of the name or email address."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching students.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Matching students.",
+                                    "type": "object",
+                                    "required": [
+                                        "students"
+                                    ],
+                                    "properties": {
+                                        "students": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StudentLink"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/students/{studentId}/link": {
+            "put": {
+                "summary": "Follow a student as the logged in teacher",
+                "tags": [
+                    "Students"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "in": "path",
+                        "name": "studentId",
+                        "required": true,
+                        "description": "Student id."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Linked.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Linked.",
+                                    "type": "object",
+                                    "required": [
+                                        "student"
+                                    ],
+                                    "properties": {
+                                        "student": {
+                                            "$ref": "#/components/schemas/StudentLink"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Stop following a student",
+                "tags": [
+                    "Students"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "in": "path",
+                        "name": "studentId",
+                        "required": true,
+                        "description": "Student id."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Unlinked.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Unlinked.",
+                                    "type": "object",
+                                    "required": [
+                                        "student"
+                                    ],
+                                    "properties": {
+                                        "student": {
+                                            "$ref": "#/components/schemas/StudentLink"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/students/{studentId}": {
             "get": {
                 "summary": "See the profile and reading list of one student",
                 "tags": [
                     "Students"
                 ],
-                "description": "Only for students who linked this teacher.",
+                "description": "Only for students this teacher follows.",
                 "parameters": [
                     {
                         "schema": {
@@ -1323,7 +1604,7 @@
                 "tags": [
                     "Students"
                 ],
-                "description": "The same advice the student sees on the advice page. Only for students who linked this teacher.",
+                "description": "The same advice the student sees on the advice page. Only for students this teacher follows.",
                 "parameters": [
                     {
                         "schema": {
@@ -2317,10 +2598,11 @@
         },
         "/api/teachers": {
             "get": {
-                "summary": "List all teachers and whether they are linked to the student",
+                "summary": "List the teachers who follow the logged in student",
                 "tags": [
                     "Teachers"
                 ],
+                "description": "Teachers link themselves to a student, a student cannot change this list.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -2328,11 +2610,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "All teachers.",
+                        "description": "Linked teachers.",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "description": "All teachers.",
+                                    "description": "Linked teachers.",
                                     "type": "object",
                                     "required": [
                                         "teachers"
@@ -2341,7 +2623,7 @@
                                         "teachers": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/TeacherLink"
+                                                "$ref": "#/components/schemas/LinkedTeacher"
                                             }
                                         }
                                     }
@@ -2361,176 +2643,6 @@
                     },
                     "403": {
                         "description": "The role of this user is not allowed to do this.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/teachers/{teacherId}/link": {
-            "put": {
-                "summary": "Let a teacher follow the logged in student",
-                "tags": [
-                    "Teachers"
-                ],
-                "parameters": [
-                    {
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "in": "path",
-                        "name": "teacherId",
-                        "required": true,
-                        "description": "Teacher id."
-                    }
-                ],
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Linked.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "description": "Linked.",
-                                    "type": "object",
-                                    "required": [
-                                        "teacher"
-                                    ],
-                                    "properties": {
-                                        "teacher": {
-                                            "$ref": "#/components/schemas/TeacherLink"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not logged in, or the token is invalid or expired.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "The role of this user is not allowed to do this.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "summary": "Stop a teacher from following the logged in student",
-                "tags": [
-                    "Teachers"
-                ],
-                "parameters": [
-                    {
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "in": "path",
-                        "name": "teacherId",
-                        "required": true,
-                        "description": "Teacher id."
-                    }
-                ],
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Unlinked.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "description": "Unlinked.",
-                                    "type": "object",
-                                    "required": [
-                                        "teacher"
-                                    ],
-                                    "properties": {
-                                        "teacher": {
-                                            "$ref": "#/components/schemas/TeacherLink"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not logged in, or the token is invalid or expired.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "The role of this user is not allowed to do this.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found.",
                         "content": {
                             "application/problem+json": {
                                 "schema": {

@@ -6,6 +6,11 @@ import { createReadingListRepository } from '../repositories/readingListReposito
 import { createUserRepository } from '../repositories/userRepository.js';
 import { createAdviceService } from '../services/adviceService.js';
 import { createReadingListService } from '../services/readingListService.js';
+import {
+    STUDENT_SEARCH_LIMIT,
+    STUDENT_SEARCH_MIN_LENGTH,
+    createTeacherLinkService,
+} from '../services/teacherLinkService.js';
 import { createTeacherService } from '../services/teacherService.js';
 
 const studentParams = {
@@ -16,7 +21,7 @@ const studentParams = {
 
 const listSchema = {
     tags: ['Students'],
-    summary: 'List the students that linked this teacher',
+    summary: 'List the students this teacher follows',
     security: secured,
     response: {
         200: wrap('students', 'StudentSummary', 'Linked students.', true),
@@ -24,10 +29,49 @@ const listSchema = {
     },
 };
 
+const searchSchema = {
+    tags: ['Students'],
+    summary: 'Search students to link to the logged in teacher',
+    description: `Searches name and email address. At most ${STUDENT_SEARCH_LIMIT} results.`,
+    security: secured,
+    querystring: {
+        type: 'object',
+        required: ['search'],
+        properties: {
+            search: {
+                type: 'string',
+                minLength: STUDENT_SEARCH_MIN_LENGTH,
+                maxLength: 100,
+                description: 'Part of the name or email address.',
+            },
+        },
+    },
+    response: {
+        200: wrap('students', 'StudentLink', 'Matching students.', true),
+        ...problems(400, 401, 403),
+    },
+};
+
+const linkSchema = {
+    tags: ['Students'],
+    summary: 'Follow a student as the logged in teacher',
+    security: secured,
+    params: studentParams,
+    response: { 200: wrap('student', 'StudentLink', 'Linked.'), ...problems(400, 401, 403, 404) },
+};
+
+const unlinkSchema = {
+    tags: ['Students'],
+    summary: 'Stop following a student',
+    security: secured,
+    params: studentParams,
+    response: { 200: wrap('student', 'StudentLink', 'Unlinked.'), ...problems(400, 401, 403, 404) },
+};
+
 const overviewSchema = {
     tags: ['Students'],
     summary: 'See the profile and reading list of one student',
-    description: 'Only for students who linked this teacher.',
+    description: 'Only for students this teacher follows.',
     security: secured,
     params: studentParams,
     response: {
@@ -40,7 +84,7 @@ const adviceSchema = {
     tags: ['Students'],
     summary: 'See the reading advice of one student',
     description:
-        'The same advice the student sees on the advice page. Only for students who linked this teacher.',
+        'The same advice the student sees on the advice page. Only for students this teacher follows.',
     security: secured,
     params: studentParams,
     response: {
@@ -77,8 +121,10 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
         readingListRepository,
         aiClient: fastify.ai,
     });
+    const userRepository = createUserRepository(fastify.db);
+    const linkService = createTeacherLinkService({ userRepository });
     const teacherService = createTeacherService({
-        userRepository: createUserRepository(fastify.db),
+        userRepository,
         profileRepository,
         readingListService,
         adviceService,
@@ -90,6 +136,31 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
     fastify.get('/students', { preHandler, schema: listSchema }, async (request) => ({
         students: await teacherService.listStudents(request.user.sub),
     }));
+
+    // A teacher looks up a student and links themselves to them.
+    fastify.get<{ Querystring: { search: string } }>(
+        '/students/search',
+        { preHandler, schema: searchSchema },
+        async (request) => ({
+            students: await linkService.searchStudents(request.user.sub, request.query.search),
+        }),
+    );
+
+    fastify.put<{ Params: { studentId: string } }>(
+        '/students/:studentId/link',
+        { preHandler, schema: linkSchema },
+        async (request) => ({
+            student: await linkService.link(request.user.sub, request.params.studentId),
+        }),
+    );
+
+    fastify.delete<{ Params: { studentId: string } }>(
+        '/students/:studentId/link',
+        { preHandler, schema: unlinkSchema },
+        async (request) => ({
+            student: await linkService.unlink(request.user.sub, request.params.studentId),
+        }),
+    );
 
     fastify.get<{ Params: { studentId: string } }>(
         '/students/:studentId',

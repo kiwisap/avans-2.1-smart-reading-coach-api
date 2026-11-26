@@ -6,6 +6,8 @@ import addFormatsModule from 'ajv-formats';
 import type { AdviceDto } from '../src/dto/adviceDto.js';
 import type { BookDto } from '../src/dto/bookDto.js';
 import type { ReadingListItemDto } from '../src/dto/readingListItemDto.js';
+import type { LinkedTeacherDto } from '../src/dto/linkedTeacherDto.js';
+import type { StudentLinkDto } from '../src/dto/studentLinkDto.js';
 import type { StudentOverviewDto } from '../src/dto/studentOverviewDto.js';
 import type { SuggestionDto } from '../src/dto/suggestionDto.js';
 import type { UserDto } from '../src/dto/userDto.js';
@@ -175,6 +177,22 @@ describe('DTOs follow the schemas', () => {
                 updatedAt: new Date(),
             },
         });
+    });
+
+    it('accepts the links between teachers and students', () => {
+        const teacher: LinkedTeacherDto = {
+            id: crypto.randomUUID(),
+            name: 'Demo Teacher',
+            email: 'teacher@example.com',
+        };
+        assertValid('LinkedTeacher', teacher);
+        const student: StudentLinkDto = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            linked: false,
+        };
+        assertValid('StudentLink', student);
     });
 
     it('rejects data that does not match', () => {

@@ -247,13 +247,24 @@ export const sharedSchemas = [
         },
     },
     {
-        $id: 'TeacherLink',
+        $id: 'LinkedTeacher',
         type: 'object',
-        required: ['id', 'name', 'linked'],
+        required: ['id', 'name', 'email'],
         properties: {
             id: uuid('Teacher id.'),
             name: text('Teacher name.'),
-            linked: { type: 'boolean', description: 'Whether this teacher can see the student.' },
+            email: text('Teacher email address.', { format: 'email' }),
+        },
+    },
+    {
+        $id: 'StudentLink',
+        type: 'object',
+        required: ['id', 'name', 'email', 'linked'],
+        properties: {
+            id: uuid('Student id.'),
+            name: text('Student name.'),
+            email: text('Student email address.', { format: 'email' }),
+            linked: { type: 'boolean', description: 'Whether this teacher follows the student.' },
         },
     },
     {
