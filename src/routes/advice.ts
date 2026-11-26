@@ -6,7 +6,6 @@ import { createReadingListRepository } from '../repositories/readingListReposito
 import { createRatingRepository } from '../repositories/ratingRepository.js';
 import { createSuggestionRepository } from '../repositories/suggestionRepository.js';
 import { createAdviceService } from '../services/adviceService.js';
-import { createSynonymRepository } from '../repositories/synonymRepository.js';
 
 export default async function adviceRoutes(fastify: FastifyInstance): Promise<void> {
     const adviceService = createAdviceService({
@@ -15,7 +14,6 @@ export default async function adviceRoutes(fastify: FastifyInstance): Promise<vo
         readingListRepository: createReadingListRepository(fastify.db),
         suggestionRepository: createSuggestionRepository(fastify.db),
         ratingRepository: createRatingRepository(fastify.db),
-        synonymRepository: createSynonymRepository(fastify.mongo.db),
         aiClient: fastify.ai,
     });
 

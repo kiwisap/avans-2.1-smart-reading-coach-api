@@ -7,7 +7,6 @@ import {
     type ProfileData,
     type ReadingGoal,
 } from '../profile/profileOptions.js';
-import type { RelatedTopics } from '../repositories/synonymRepository.js';
 
 // How much each match is worth. Kept in one place so the matching is easy to explain and tune.
 export const WEIGHTS = {
@@ -60,11 +59,7 @@ export function allowedLevels(profileLevel: LanguageLevel): LanguageLevel[] {
 }
 
 // Returns null when the book is too difficult, otherwise the score and why it matched.
-export function scoreBook(
-    profile: ProfileData,
-    book: ScorableBook,
-    related: RelatedTopics = new Map(),
-): ScoreResult | null {
+export function scoreBook(profile: ProfileData, book: ScorableBook): ScoreResult | null {
     const bookLevels = book.levels ?? [];
     const easiest = Math.min(...bookLevels.map(rank));
     if (bookLevels.length > 0 && easiest > rank(profile.languageLevel)) return null;
@@ -86,13 +81,7 @@ export function scoreBook(
         score += WEIGHTS.levelEasier;
     }
 
-    // A topic matches its own theme and the themes the AI service learned as related to it.
-    const themes = book.themes ?? [];
-    reasons.topics = profile.topics.filter(
-        (topic) =>
-            themes.includes(topic) ||
-            (related.get(topic) ?? []).some((theme) => themes.includes(theme)),
-    );
+    reasons.topics = (book.themes ?? []).filter((theme) => profile.topics.includes(theme));
     score += reasons.topics.length * WEIGHTS.perTopic;
 
     if (profile.materialTypes.includes(book.type)) {
