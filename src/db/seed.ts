@@ -10,7 +10,8 @@ const userRepository = createUserRepository(drizzle(pool, { schema }));
 
 async function ensureUser(input: {
     email: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     role: UserRole;
     password: string;
 }) {
@@ -19,7 +20,8 @@ async function ensureUser(input: {
     const passwordHash = await bcrypt.hash(input.password, 10);
     return userRepository.create({
         email: input.email,
-        name: input.name,
+        firstName: input.firstName,
+        lastName: input.lastName,
         role: input.role,
         passwordHash,
     });
@@ -28,13 +30,15 @@ async function ensureUser(input: {
 // Development accounts only. Change these passwords for anything that is not local.
 const teacher = await ensureUser({
     email: 'teacher@example.com',
-    name: 'Demo Teacher',
+    firstName: 'Demo',
+    lastName: 'Teacher',
     role: 'teacher',
     password: 'Password123!',
 });
 const student = await ensureUser({
     email: 'student@example.com',
-    name: 'Demo Student',
+    firstName: 'Demo',
+    lastName: 'Student',
     role: 'student',
     password: 'Password123!',
 });

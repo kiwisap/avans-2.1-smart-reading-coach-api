@@ -2,13 +2,24 @@ import { and, eq, sql } from 'drizzle-orm';
 import { readingProfiles, teacherStudents, users } from '../db/schema.js';
 import type { User } from '../entities/user.js';
 import type { Database } from '../db/types.js';
+import { cleanInfix, fullName } from '../auth/fullName.js';
 import type { UserRole } from '../auth/roles.js';
 
 export interface NewUser {
     email: string;
     passwordHash: string;
-    name: string;
+    firstName: string;
+    infix?: string | null;
+    lastName: string;
     role?: UserRole;
+}
+
+export interface AccountChanges {
+    email?: string;
+    firstName?: string;
+    infix?: string | null;
+    lastName?: string;
+    name?: string;
 }
 
 export function createUserRepository(db: Database) {
@@ -23,16 +34,31 @@ export function createUserRepository(db: Database) {
             return user ?? null;
         },
 
-        async create({ email, passwordHash, name, role = 'student' }: NewUser): Promise<User> {
+        async create({
+            email,
+            passwordHash,
+            firstName,
+            infix = null,
+            lastName,
+            role = 'student',
+        }: NewUser): Promise<User> {
             const [user] = await db
                 .insert(users)
-                .values({ email, passwordHash, name, role })
+                .values({
+                    email,
+                    passwordHash,
+                    firstName: firstName.trim(),
+                    infix: cleanInfix(infix),
+                    lastName: lastName.trim(),
+                    name: fullName({ firstName, infix, lastName }),
+                    role,
+                })
                 .returning();
             if (!user) throw new Error('Could not create user');
             return user;
         },
 
-        async updateAccount(id: string, changes: { name?: string; email?: string }): Promise<User> {
+        async updateAccount(id: string, changes: AccountChanges): Promise<User> {
             const [user] = await db.update(users).set(changes).where(eq(users.id, id)).returning();
             if (!user) throw new Error('Could not update user');
             return user;
@@ -40,6 +66,15 @@ export function createUserRepository(db: Database) {
 
         async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
             await db.update(users).set({ passwordHash }).where(eq(users.id, id));
+        },
+
+        // The reading profile, reading list and teacher links are removed with it (ON DELETE CASCADE).
+        async remove(id: string): Promise<boolean> {
+            const removed = await db
+                .delete(users)
+                .where(eq(users.id, id))
+                .returning({ id: users.id });
+            return removed.length > 0;
         },
 
         // Students linked to a teacher, with a flag for whether their reading profile is filled in.

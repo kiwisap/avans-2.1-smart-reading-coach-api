@@ -123,7 +123,10 @@ describe('DTOs follow the schemas', () => {
     const user: UserDto = {
         id: crypto.randomUUID(),
         email: 'a@b.nl',
-        name: 'Sam',
+        name: 'Sam van der Berg',
+        firstName: 'Sam',
+        infix: 'van der',
+        lastName: 'Berg',
         role: 'student',
     };
 

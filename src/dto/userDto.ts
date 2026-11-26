@@ -4,6 +4,9 @@ import type { UserRole } from '../auth/roles.js';
 export interface UserDto {
     id: string;
     email: string;
-    name: string;
+    name: string; // display name, for example "Sanne van der Berg"
+    firstName: string;
+    infix: string | null; // tussenvoegsel
+    lastName: string;
     role: UserRole;
 }

@@ -13,7 +13,15 @@ import type { User } from '../entities/user.js';
 // or the Mongo _id never leak into a response by accident.
 
 export function toUserDto(user: User): UserDto {
-    return { id: user.id, email: user.email, name: user.name, role: user.role };
+    return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        firstName: user.firstName,
+        infix: user.infix,
+        lastName: user.lastName,
+        role: user.role,
+    };
 }
 
 export function toProfileDto(profile: ReadingProfile | null): ProfileDto | null {

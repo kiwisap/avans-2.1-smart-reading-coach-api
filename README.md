@@ -204,7 +204,10 @@ erDiagram
         uuid id PK
         text email UK
         text password_hash
-        text name
+        text name "weergavenaam"
+        text first_name
+        text infix "tussenvoegsel, optioneel"
+        text last_name
         user_role role "student of teacher"
         timestamptz created_at
     }
@@ -277,8 +280,9 @@ Alle paden beginnen met `/api`.
 | `POST /auth/register`                                               | iedereen | Account aanmaken (rol leerling)                                                                                                                              |
 | `POST /auth/login`                                                  | iedereen | Inloggen, geeft een token                                                                                                                                    |
 | `GET /auth/me`                                                      | ingelogd | Huidige gebruiker                                                                                                                                            |
-| `PATCH /auth/me`                                                    | ingelogd | Naam of e-mailadres wijzigen (een nieuw e-mailadres vraagt het huidige wachtwoord)                                                                           |
+| `PATCH /auth/me`                                                    | ingelogd | Voornaam, tussenvoegsel, achternaam of e-mailadres wijzigen (een nieuw e-mailadres vraagt het huidige wachtwoord)                                            |
 | `PUT /auth/me/password`                                             | ingelogd | Wachtwoord wijzigen met het huidige wachtwoord                                                                                                               |
+| `DELETE /auth/me`                                                   | ingelogd | Account verwijderen met het huidige wachtwoord, samen met leesprofiel, leeslijst en koppelingen met docenten                                                 |
 | `GET /books`                                                        | ingelogd | Catalogus met zoeken, filters en paginering (`search`, `type`, `level`, `theme` (elk herhaalbaar, bijvoorbeeld `theme=humor&theme=oorlog`), `page`, `limit`) |
 | `GET /books/filters`                                                | ingelogd | Beschikbare waarden voor de filters                                                                                                                          |
 | `GET /books/:id`                                                    | ingelogd | Eén titel                                                                                                                                                    |
@@ -349,7 +353,7 @@ De unit tests dekken de kernlogica, zonder database:
 | Bestand                      | Wat wordt getest                                                                                                                                                                                         |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scoring.test.ts`            | Puntentelling, te moeilijke titels, motivatietekst en het randgeval van een titel zonder niveau                                                                                                          |
-| `accountService.test.ts`     | Naam en e-mailadres wijzigen, huidig wachtwoord nodig voor een nieuw e-mailadres en een nieuw wachtwoord, bezet e-mailadres, hetzelfde wachtwoord, verwijderd account                                    |
+| `accountService.test.ts`     | Naam in delen (voornaam, tussenvoegsel, achternaam) wijzigen, e-mailadres alleen met het huidige wachtwoord, bezet e-mailadres, wachtwoord wijzigen, account verwijderen, verwijderd account             |
 | `adviceService.test.ts`      | Eerst een profiel invullen, beste treffer bovenaan, minstens drie suggesties, nooit een te moeilijke titel, AI advies in de volgorde van het model, leeslijst als geschiedenis, terugvallen op de regels |
 | `aiClient.test.ts`           | Verzoek naar de AI service (profiel, geschiedenis, API sleutel), null bij een fout, time out of vreemd antwoord, health check                                                                            |
 | `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                                                                               |

@@ -18,7 +18,10 @@ export const users = pgTable('users', {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull().unique(),
     passwordHash: text('password_hash').notNull(),
-    name: text('name').notNull(),
+    name: text('name').notNull(), // display name: first name, infix and last name together
+    firstName: text('first_name').notNull().default(''),
+    infix: text('infix'), // tussenvoegsel, for example "van der"
+    lastName: text('last_name').notNull().default(''),
     role: userRole('role').notNull().default('student'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

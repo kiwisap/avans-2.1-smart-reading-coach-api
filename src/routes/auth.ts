@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ChangePasswordDto } from '../dto/changePasswordDto.js';
+import type { DeleteAccountDto } from '../dto/deleteAccountDto.js';
 import type { LoginDto } from '../dto/loginDto.js';
 import type { RegisterDto } from '../dto/registerDto.js';
 import type { UpdateAccountDto } from '../dto/updateAccountDto.js';
@@ -16,6 +17,13 @@ const credentials = {
     password: { type: 'string', minLength: 8, maxLength: 72 },
 };
 
+// A name in parts, so it can be shown and sorted the Dutch way ("van der Berg").
+const nameParts = {
+    firstName: { type: 'string', minLength: 1, maxLength: 60, description: 'Voornaam.' },
+    infix: { type: 'string', maxLength: 20, description: 'Tussenvoegsel, for example "van der".' },
+    lastName: { type: 'string', minLength: 1, maxLength: 80, description: 'Achternaam.' },
+};
+
 const registerSchema = {
     tags: ['Auth'],
     summary: 'Create a student account',
@@ -24,11 +32,11 @@ const registerSchema = {
     response: { 201: ok('AuthResponse', 'Account created.'), ...problems(400, 409) },
     body: {
         type: 'object',
-        required: ['email', 'password', 'name'],
+        required: ['email', 'password', 'firstName', 'lastName'],
         additionalProperties: false,
         properties: {
             ...credentials,
-            name: { type: 'string', minLength: 1, maxLength: 100 },
+            ...nameParts,
         },
     },
 };
@@ -57,7 +65,8 @@ const meSchema = {
 
 const updateMeSchema = {
     tags: ['Auth'],
-    summary: 'Change the name or email address of the logged in user',
+    summary:
+        'Change the name (first name, infix, last name) or email address of the logged in user',
     description:
         'Send only what changes. A new email address also needs the current password, so nobody ' +
         'can take over an account from an unlocked computer.',
@@ -71,7 +80,7 @@ const updateMeSchema = {
         additionalProperties: false,
         minProperties: 1,
         properties: {
-            name: { type: 'string', minLength: 1, maxLength: 100 },
+            ...nameParts,
             email: credentials.email,
             currentPassword: { type: 'string', minLength: 1, maxLength: 72 },
         },
@@ -93,6 +102,27 @@ const passwordSchema = {
         properties: {
             currentPassword: { type: 'string', minLength: 1, maxLength: 72 },
             newPassword: credentials.password,
+        },
+    },
+};
+
+const deleteMeSchema = {
+    tags: ['Auth'],
+    summary: 'Delete the account of the logged in user',
+    description:
+        'Removes the account with its reading profile, reading list and teacher links. Cannot be ' +
+        'undone. Needs the current password.',
+    security: secured,
+    response: {
+        204: { description: 'Account removed. The token no longer works.', type: 'null' },
+        ...problems(400, 401),
+    },
+    body: {
+        type: 'object',
+        required: ['currentPassword'],
+        additionalProperties: false,
+        properties: {
+            currentPassword: { type: 'string', minLength: 1, maxLength: 72 },
         },
     },
 };
@@ -142,6 +172,15 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
         { preHandler: fastify.authenticate, schema: passwordSchema },
         async (request, reply) => {
             await accountService.changePassword(request.user.sub, request.body);
+            return reply.code(204).send();
+        },
+    );
+
+    fastify.delete<{ Body: DeleteAccountDto }>(
+        '/auth/me',
+        { preHandler: fastify.authenticate, schema: deleteMeSchema },
+        async (request, reply) => {
+            await accountService.deleteAccount(request.user.sub, request.body.currentPassword);
             return reply.code(204).send();
         },
     );

@@ -8,6 +8,9 @@ import { createTeacherService } from '../src/services/teacherService.js';
 const makeUser = (id: string, name: string, role: User['role']): User => ({
     id,
     name,
+    firstName: name,
+    infix: null,
+    lastName: '',
     role,
     email: `${id}@example.com`,
     passwordHash: 'hash',

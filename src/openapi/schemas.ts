@@ -114,11 +114,14 @@ export const sharedSchemas = [
     {
         $id: 'User',
         type: 'object',
-        required: ['id', 'email', 'name', 'role'],
+        required: ['id', 'email', 'name', 'firstName', 'infix', 'lastName', 'role'],
         properties: {
             id: uuid('User id.'),
             email: text('Email address.', { format: 'email' }),
-            name: text('Display name.'),
+            name: text('Display name: first name, infix and last name together.'),
+            firstName: text('Voornaam.'),
+            infix: nullableText('Tussenvoegsel, for example "van der". Null when there is none.'),
+            lastName: text('Achternaam.'),
             role: { $ref: 'Role#' },
         },
     },

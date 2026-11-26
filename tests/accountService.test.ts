@@ -1,35 +1,35 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import bcrypt from 'bcryptjs';
+import { fullName } from '../src/auth/fullName.js';
 import type { User } from '../src/entities/user.js';
+import type { AccountChanges } from '../src/repositories/userRepository.js';
 import { createAccountService } from '../src/services/accountService.js';
 
 const PASSWORD = 'Password123!';
 const hash = bcrypt.hashSync(PASSWORD, 4);
 
+const makeUser = (id: string, email: string, firstName: string, lastName: string): User => ({
+    id,
+    email,
+    name: `${firstName} ${lastName}`,
+    firstName,
+    infix: null,
+    lastName,
+    role: 'student',
+    passwordHash: hash,
+    createdAt: new Date(),
+});
+
 function setup() {
     const users: User[] = [
-        {
-            id: 'u1',
-            email: 'sam@example.com',
-            name: 'Sam',
-            role: 'student',
-            passwordHash: hash,
-            createdAt: new Date(),
-        },
-        {
-            id: 'u2',
-            email: 'taken@example.com',
-            name: 'Kim',
-            role: 'student',
-            passwordHash: hash,
-            createdAt: new Date(),
-        },
+        makeUser('u1', 'sam@example.com', 'Sam', 'Berg'),
+        makeUser('u2', 'taken@example.com', 'Kim', 'Jansen'),
     ];
     const userRepository = {
         findById: async (id: string) => users.find((user) => user.id === id) ?? null,
         findByEmail: async (email: string) => users.find((user) => user.email === email) ?? null,
-        updateAccount: async (id: string, changes: { name?: string; email?: string }) => {
+        updateAccount: async (id: string, changes: AccountChanges) => {
             const user = users.find((item) => item.id === id);
             if (!user) throw new Error('not found');
             Object.assign(user, changes);
@@ -39,6 +39,12 @@ function setup() {
             const user = users.find((item) => item.id === id);
             if (user) user.passwordHash = passwordHash;
         },
+        remove: async (id: string) => {
+            const index = users.findIndex((item) => item.id === id);
+            if (index === -1) return false;
+            users.splice(index, 1);
+            return true;
+        },
     };
     return { service: createAccountService({ userRepository }), users };
 }
@@ -46,11 +52,36 @@ function setup() {
 const statusOf = (err: unknown) => (err as { statusCode?: number }).statusCode;
 const codeOf = (err: unknown) => (err as { code?: string }).code;
 
+describe('fullName', () => {
+    it('joins first name, infix and last name and skips an empty infix', () => {
+        assert.equal(
+            fullName({ firstName: 'Sanne', infix: 'van der', lastName: 'Berg' }),
+            'Sanne van der Berg',
+        );
+        assert.equal(fullName({ firstName: 'Sam', infix: null, lastName: 'Berg' }), 'Sam Berg');
+        assert.equal(fullName({ firstName: ' Sam ', infix: '  ', lastName: 'Berg' }), 'Sam Berg');
+    });
+});
+
 describe('accountService', () => {
-    it('changes the name without asking for the password', async () => {
+    it('changes the name parts without asking for the password and rebuilds the full name', async () => {
         const { service } = setup();
-        const user = await service.updateAccount('u1', { name: '  Sam de Vries ' });
-        assert.equal(user.name, 'Sam de Vries');
+        const user = await service.updateAccount('u1', {
+            firstName: ' Sanne ',
+            infix: 'van der',
+            lastName: 'Berg',
+        });
+        assert.equal(user.firstName, 'Sanne');
+        assert.equal(user.infix, 'van der');
+        assert.equal(user.name, 'Sanne van der Berg');
+    });
+
+    it('removes the infix when it is sent empty', async () => {
+        const { service } = setup();
+        await service.updateAccount('u1', { infix: 'de' });
+        const user = await service.updateAccount('u1', { infix: '' });
+        assert.equal(user.infix, null);
+        assert.equal(user.name, 'Sam Berg');
     });
 
     it('changes the email address with the current password, in lowercase', async () => {
@@ -85,7 +116,10 @@ describe('accountService', () => {
 
     it('does not ask for the password when the email address stays the same', async () => {
         const { service } = setup();
-        const user = await service.updateAccount('u1', { email: 'SAM@example.com', name: 'Sam' });
+        const user = await service.updateAccount('u1', {
+            email: 'SAM@example.com',
+            firstName: 'Sam',
+        });
         assert.equal(user.email, 'sam@example.com');
     });
 
@@ -110,10 +144,24 @@ describe('accountService', () => {
         );
     });
 
+    it('deletes the account only with the right password', async () => {
+        const { service, users } = setup();
+        await assert.rejects(
+            service.deleteAccount('u1', 'wrong'),
+            (err: unknown) => codeOf(err) === 'account.wrongPassword',
+        );
+        assert.equal(users.length, 2);
+        await service.deleteAccount('u1', PASSWORD);
+        assert.deepEqual(
+            users.map((user) => user.id),
+            ['u2'],
+        );
+    });
+
     it('treats a removed account as logged out', async () => {
         const { service } = setup();
         await assert.rejects(
-            service.updateAccount('gone', { name: 'X' }),
+            service.updateAccount('gone', { firstName: 'X' }),
             (err: unknown) => statusOf(err) === 401,
         );
     });
