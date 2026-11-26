@@ -358,6 +358,8 @@ Voor beide bronnen geldt:
 
 ## Game: XP en badges
 
+In de app heten XP **veren**: Bo is een uil, en leerlingen verzamelen zijn veren. In de code en de API heet het `xp`.
+
 Leerlingen verdienen XP (`progress/xp.ts`): leesprofiel invullen 50, titel uit de catalogus op de leeslijst 10, tip van Bo op de leeslijst 15, titel uitlezen 40 en beoordelen 10. Elke reden telt één keer per titel, dus toevoegen en weer verwijderen of opnieuw op gelezen zetten levert niets extra op. Badges komen bij 50, 150, 300, 500, 800 en 1200 XP. Een titel die een docent toevoegt geeft geen XP, die verdient de leerling pas door hem te lezen. Migratie `0004_reading_game` geeft bestaande leerlingen de XP voor wat ze al gedaan hadden.
 
 ## Tests
