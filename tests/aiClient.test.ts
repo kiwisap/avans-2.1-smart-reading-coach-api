@@ -12,10 +12,10 @@ const profile: ProfileData = {
 };
 
 const answer = {
-    modelVersion: '1.0.0',
+    modelVersion: '2.0.0',
     recommendations: [
         {
-            cataloguscode: 'CAT-00120',
+            catalogCode: 'CAT-00120',
             key: 'heartstopper 3|alice oseman|boek',
             title: 'Heartstopper 3',
             author: 'Alice Oseman',
@@ -24,7 +24,7 @@ const answer = {
             level: '2F',
             score: 0.91,
             reasons: ['Het gaat over vriendschap.'],
-            summary: 'Het gaat over vriendschap.',
+            motivation: 'Het gaat over vriendschap, en daar lees jij graag over.',
         },
     ],
 };
@@ -92,10 +92,25 @@ describe('aiClient', () => {
         assert.equal(await client.recommend(profile, [], 5), null);
     });
 
+    it('asks the service to retrain and reports whether it started', async () => {
+        const { fetchImpl, calls } = fakeFetch(() => json({ status: 'started' }, 202));
+        const client = createAiClient({ baseUrl: 'http://ai:8000', apiKey: 'geheim', fetchImpl });
+        assert.equal(await client.retrain(), true);
+        assert.equal(calls[0]?.url, 'http://ai:8000/api/admin/retrain');
+        assert.equal(calls[0]?.init?.method, 'POST');
+        assert.equal((calls[0]?.init?.headers as Record<string, string>)['x-api-key'], 'geheim');
+
+        const busy = createAiClient({
+            baseUrl: 'http://ai:8000',
+            fetchImpl: fakeFetch(() => json({ title: 'Bezig' }, 409)).fetchImpl,
+        });
+        assert.equal(await busy.retrain(), false);
+    });
+
     it('reports healthy only when the service has a model', async () => {
         const ready = createAiClient({
             baseUrl: 'http://ai:8000',
-            fetchImpl: fakeFetch(() => json({ status: 'ok', modelVersion: '1.0.0' })).fetchImpl,
+            fetchImpl: fakeFetch(() => json({ status: 'ok', modelVersion: '2.0.0' })).fetchImpl,
         });
         const untrained = createAiClient({
             baseUrl: 'http://ai:8000',

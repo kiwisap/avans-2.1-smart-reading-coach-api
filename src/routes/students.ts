@@ -11,6 +11,7 @@ import { createRatingRepository } from '../repositories/ratingRepository.js';
 import { createAdviceStatsService } from '../services/adviceStatsService.js';
 import { createProgressService } from '../services/progressService.js';
 import { createAdviceService } from '../services/adviceService.js';
+import { createSynonymRepository } from '../repositories/synonymRepository.js';
 import { createReadingListService } from '../services/readingListService.js';
 import {
     STUDENT_SEARCH_LIMIT,
@@ -147,6 +148,7 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
         readingListRepository,
         suggestionRepository: createSuggestionRepository(fastify.db),
         ratingRepository,
+        synonymRepository: createSynonymRepository(fastify.mongo.db),
         aiClient: fastify.ai,
     });
     const userRepository = createUserRepository(fastify.db);

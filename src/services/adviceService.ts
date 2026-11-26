@@ -1,7 +1,7 @@
 import { HttpError } from '../errors.js';
 import { DEFAULT_LOCALE, t, type Locale } from '../i18n.js';
 import type { AiClient, AiHistoryItem } from '../advice/aiClient.js';
-import { buildReasons, describeBook } from '../advice/motivation.js';
+import { buildReasons, buildStory, describeBook } from '../advice/motivation.js';
 import { allowedLevels, scoreBook } from '../advice/scoring.js';
 import type { AdviceDto } from '../dto/adviceDto.js';
 import type { BookDto } from '../dto/bookDto.js';
@@ -13,6 +13,7 @@ import type { ReadingListItem } from '../entities/readingListItem.js';
 import type { ReadingListRepository } from '../repositories/readingListRepository.js';
 import type { PeerRating, RatingRepository } from '../repositories/ratingRepository.js';
 import type { SuggestionRepository } from '../repositories/suggestionRepository.js';
+import type { RelatedTopics, SynonymRepository } from '../repositories/synonymRepository.js';
 import { MIN_PEER_RATINGS } from '../readingList/ratings.js';
 
 export const MIN_SUGGESTIONS = 3;
@@ -32,6 +33,7 @@ interface Deps {
     readingListRepository: Pick<ReadingListRepository, 'listByUser'>;
     suggestionRepository: Pick<SuggestionRepository, 'recordShown'>;
     ratingRepository: Pick<RatingRepository, 'findForBooks' | 'peerRatings'>;
+    synonymRepository: Pick<SynonymRepository, 'relatedTo'>;
     aiClient: AiClient | null;
 }
 
@@ -47,6 +49,7 @@ export function createAdviceService({
     readingListRepository,
     suggestionRepository,
     ratingRepository,
+    synonymRepository,
     aiClient,
 }: Deps) {
     // Only peer ratings with enough votes count.
@@ -63,13 +66,20 @@ export function createAdviceService({
 
     // Titles on the reading list (read or saved) are never suggested again, so the advice
     // changes with what the student does.
-    async function findCandidates(profile: ProfileData, onList: Set<string>): Promise<BookDto[]> {
+    async function findCandidates(
+        profile: ProfileData,
+        onList: Set<string>,
+        related: RelatedTopics,
+    ): Promise<BookDto[]> {
         const levels = allowedLevels(profile.languageLevel);
         const notOnList = (books: BookDto[]) => books.filter((book) => !onList.has(book.id));
+        const topics = [
+            ...new Set(profile.topics.flatMap((topic) => [topic, ...(related.get(topic) ?? [])])),
+        ];
         const matching = notOnList(
             await bookRepository.findCandidates({
                 allowedLevels: levels,
-                topics: profile.topics,
+                topics,
                 materialTypes: profile.materialTypes,
             }),
         );
@@ -86,10 +96,12 @@ export function createAdviceService({
         onList: Set<string>,
         peers: Map<string, PeerRating>,
     ): Promise<SuggestionDto[]> {
-        const candidates = await findCandidates(profile, onList);
+        // Related themes come from the AI service; without them the topics match exactly.
+        const related = await synonymRepository.relatedTo(profile.topics);
+        const candidates = await findCandidates(profile, onList, related);
 
         const scored = candidates.flatMap((book) => {
-            const result = scoreBook(profile, book);
+            const result = scoreBook(profile, book, related);
             if (!result) return [];
             const peer = peerFor(peers, book.id);
             if (peer && peer.average < PEER_REJECT) return [];
@@ -106,15 +118,15 @@ export function createAdviceService({
             .slice(0, MAX_SUGGESTIONS)
             .map(({ book, peer, result }) => {
                 const praise = peerReason(peer, locale);
-                const reasons = [
-                    ...buildReasons(profile, book, result.reasons, locale),
-                    ...(praise ? [praise] : []),
-                ];
+                const story = buildStory(profile, book, result.reasons, locale);
                 return {
                     ...book,
                     description: describeBook(book, locale),
-                    motivation: reasons.join(' '),
-                    reasons,
+                    motivation: praise ? `${story} ${praise}` : story,
+                    reasons: [
+                        ...buildReasons(profile, book, result.reasons, locale),
+                        ...(praise ? [praise] : []),
+                    ],
                 };
             });
     }
@@ -166,16 +178,13 @@ export function createAdviceService({
             const peer = peerFor(peers, book.id);
             if (peer && peer.average < PEER_REJECT) return [];
             const praise = peerReason(peer, locale);
-            const reasons = [
-                ...(item.reasons.length > 0 ? item.reasons : [item.summary]),
-                ...(praise ? [praise] : []),
-            ];
+            const story = item.motivation || item.reasons.join(' ');
             return [
                 {
                     ...book,
                     description: describeBook(book, locale),
-                    motivation: item.summary || reasons.join(' '),
-                    reasons,
+                    motivation: praise ? `${story} ${praise}` : story,
+                    reasons: [...item.reasons, ...(praise ? [praise] : [])],
                 },
             ];
         });
