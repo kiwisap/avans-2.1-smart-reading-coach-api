@@ -924,6 +924,163 @@
                         }
                     }
                 }
+            },
+            "patch": {
+                "summary": "Change the name or email address of the logged in user",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "Send only what changes. A new email address also needs the current password, so nobody can take over an account from an unlocked computer.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "minProperties": 1,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 100
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 254
+                                    },
+                                    "currentPassword": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 72
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The updated user.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "The updated user.",
+                                    "type": "object",
+                                    "required": [
+                                        "user"
+                                    ],
+                                    "properties": {
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict with the current state.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/me/password": {
+            "put": {
+                "summary": "Change the password of the logged in user",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "currentPassword",
+                                    "newPassword"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "currentPassword": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 72
+                                    },
+                                    "newPassword": {
+                                        "type": "string",
+                                        "minLength": 8,
+                                        "maxLength": 72
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Password changed. The current token stays valid."
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/students": {

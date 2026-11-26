@@ -21,6 +21,11 @@
             "emailTaken": "Er bestaat al een account met dit e-mailadres",
             "invalidCredentials": "Onjuist e-mailadres of wachtwoord"
         },
+        "account": {
+            "passwordRequired": "Vul je huidige wachtwoord in om dit te wijzigen",
+            "wrongPassword": "Je huidige wachtwoord klopt niet",
+            "samePassword": "Je nieuwe wachtwoord moet anders zijn dan je huidige wachtwoord"
+        },
         "books": {
             "notFound": "Titel niet gevonden"
         },
@@ -47,6 +52,8 @@
     "fields": {
         "email": "e-mailadres",
         "password": "wachtwoord",
+        "currentPassword": "huidige wachtwoord",
+        "newPassword": "nieuwe wachtwoord",
         "name": "naam",
         "languageLevel": "leesniveau",
         "materialTypes": "soorten teksten",

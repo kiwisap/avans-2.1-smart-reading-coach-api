@@ -32,6 +32,16 @@ export function createUserRepository(db: Database) {
             return user;
         },
 
+        async updateAccount(id: string, changes: { name?: string; email?: string }): Promise<User> {
+            const [user] = await db.update(users).set(changes).where(eq(users.id, id)).returning();
+            if (!user) throw new Error('Could not update user');
+            return user;
+        },
+
+        async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
+            await db.update(users).set({ passwordHash }).where(eq(users.id, id));
+        },
+
         // Students linked to a teacher, with a flag for whether their reading profile is filled in.
         async findStudentsOfTeacher(teacherId: string) {
             return db

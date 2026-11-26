@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify';
+import type { ChangePasswordDto } from '../dto/changePasswordDto.js';
 import type { LoginDto } from '../dto/loginDto.js';
 import type { RegisterDto } from '../dto/registerDto.js';
+import type { UpdateAccountDto } from '../dto/updateAccountDto.js';
 import type { UserDto } from '../dto/userDto.js';
 import { HttpError } from '../errors.js';
 import { ok, problems, secured, wrap } from '../openapi/helpers.js';
 import { createUserRepository } from '../repositories/userRepository.js';
+import { createAccountService } from '../services/accountService.js';
 import { createAuthService } from '../services/authService.js';
 import { toUserDto } from '../services/mappingService.js';
 
@@ -52,9 +55,52 @@ const meSchema = {
     response: { 200: wrap('user', 'User', 'The logged in user.'), ...problems(401) },
 };
 
+const updateMeSchema = {
+    tags: ['Auth'],
+    summary: 'Change the name or email address of the logged in user',
+    description:
+        'Send only what changes. A new email address also needs the current password, so nobody ' +
+        'can take over an account from an unlocked computer.',
+    security: secured,
+    response: {
+        200: wrap('user', 'User', 'The updated user.'),
+        ...problems(400, 401, 409),
+    },
+    body: {
+        type: 'object',
+        additionalProperties: false,
+        minProperties: 1,
+        properties: {
+            name: { type: 'string', minLength: 1, maxLength: 100 },
+            email: credentials.email,
+            currentPassword: { type: 'string', minLength: 1, maxLength: 72 },
+        },
+    },
+};
+
+const passwordSchema = {
+    tags: ['Auth'],
+    summary: 'Change the password of the logged in user',
+    security: secured,
+    response: {
+        204: { description: 'Password changed. The current token stays valid.', type: 'null' },
+        ...problems(400, 401),
+    },
+    body: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        additionalProperties: false,
+        properties: {
+            currentPassword: { type: 'string', minLength: 1, maxLength: 72 },
+            newPassword: credentials.password,
+        },
+    },
+};
+
 export default async function authRoutes(fastify: FastifyInstance): Promise<void> {
     const userRepository = createUserRepository(fastify.db);
     const authService = createAuthService({ userRepository });
+    const accountService = createAccountService({ userRepository });
 
     const issueToken = (user: UserDto): string =>
         fastify.jwt.sign({ sub: user.id, role: user.role });
@@ -80,6 +126,23 @@ export default async function authRoutes(fastify: FastifyInstance): Promise<void
             const user = await userRepository.findById(request.user.sub);
             if (!user) throw new HttpError(401, 'auth.accountGone');
             return { user: toUserDto(user) };
+        },
+    );
+
+    fastify.patch<{ Body: UpdateAccountDto }>(
+        '/auth/me',
+        { preHandler: fastify.authenticate, schema: updateMeSchema },
+        async (request) => ({
+            user: await accountService.updateAccount(request.user.sub, request.body),
+        }),
+    );
+
+    fastify.put<{ Body: ChangePasswordDto }>(
+        '/auth/me/password',
+        { preHandler: fastify.authenticate, schema: passwordSchema },
+        async (request, reply) => {
+            await accountService.changePassword(request.user.sub, request.body);
+            return reply.code(204).send();
         },
     );
 }
