@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { ReadingProfile } from '../src/entities/readingProfile.js';
 import type { User } from '../src/entities/user.js';
 import { createTeacherLinkService } from '../src/services/teacherLinkService.js';
+import { toProgress } from '../src/services/progressService.js';
 import { createTeacherService } from '../src/services/teacherService.js';
 
 const makeUser = (id: string, name: string, role: User['role']): User => ({
@@ -36,7 +37,7 @@ const profile: ReadingProfile = {
 
 function setup(links: [string, string][] = [['t1', 's1']]) {
     const linkSet = new Set(links.map(([teacher, student]) => `${teacher}:${student}`));
-    const added: { studentId: string; bookId: string }[] = [];
+    const added: { studentId: string; bookId: string; source: string }[] = [];
     const searches: { query: string; limit: number }[] = [];
 
     const userRepository = {
@@ -77,17 +78,23 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
                 status: 'unread' as const,
                 addedAt: new Date(),
                 readAt: null,
+                source: null,
+                rating: null,
+                comment: null,
                 book: null,
             },
         ],
-        add: async (studentId: string, bookId: string) => {
-            added.push({ studentId, bookId });
+        add: async (studentId: string, bookId: string, source: string) => {
+            added.push({ studentId, bookId, source });
             return {
                 id: 'i2',
                 bookId,
                 status: 'unread' as const,
                 addedAt: new Date(),
                 readAt: null,
+                source: null,
+                rating: null,
+                comment: null,
                 book: null,
             };
         },
@@ -95,8 +102,10 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
 
     const adviceRequests: string[] = [];
     const adviceService = {
-        getAdvice: async (studentId: string) => {
-            adviceRequests.push(studentId);
+        getAdvice: async (studentId: string, _locale?: unknown, options?: { record?: boolean }) => {
+            adviceRequests.push(
+                `${studentId}:${options?.record === false ? 'norecord' : 'record'}`,
+            );
             return { source: 'rules' as const, suggestions: [] };
         },
     };
@@ -107,6 +116,7 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
             profileRepository,
             readingListService,
             adviceService,
+            progressService: { getProgress: async () => toProgress([]) },
         }),
         adviceRequests,
         linkService: createTeacherLinkService({ userRepository }),
@@ -125,6 +135,7 @@ describe('teacherService', () => {
         assert.equal(overview.student.name, 'Student');
         assert.equal(overview.profile?.languageLevel, '2F');
         assert.equal(overview.readingList.length, 1);
+        assert.equal(overview.progress.xp, 0);
     });
 
     it('refuses access to a student who is not linked to this teacher', async () => {
@@ -139,7 +150,8 @@ describe('teacherService', () => {
         const { teacherService, adviceRequests } = setup();
         const advice = await teacherService.getStudentAdvice('t1', 's1');
         assert.equal(advice.source, 'rules');
-        assert.deepEqual(adviceRequests, ['s1']);
+        // A teacher looking does not count as Bo showing the titles to the student.
+        assert.deepEqual(adviceRequests, ['s1:norecord']);
     });
 
     it('does not show the advice of a student who is not linked', async () => {
@@ -154,7 +166,7 @@ describe('teacherService', () => {
     it("lets a teacher add a title to a linked student's list", async () => {
         const { teacherService, added } = setup();
         await teacherService.addToStudentReadingList('t1', 's1', 'b1');
-        assert.deepEqual(added, [{ studentId: 's1', bookId: 'b1' }]);
+        assert.deepEqual(added, [{ studentId: 's1', bookId: 'b1', source: 'teacher' }]);
     });
 
     it('does not add titles for a student who is not linked', async () => {

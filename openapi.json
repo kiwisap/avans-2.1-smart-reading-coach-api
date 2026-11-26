@@ -69,6 +69,15 @@
                 ],
                 "description": "Whether the student has read the title."
             },
+            "ReadingListSource": {
+                "type": "string",
+                "enum": [
+                    "advice",
+                    "catalog",
+                    "teacher"
+                ],
+                "description": "Where a title on the reading list came from: the advice page, the catalog or a teacher."
+            },
             "ProblemDetails": {
                 "type": "object",
                 "description": "Error response according to RFC 9457 (application/problem+json).",
@@ -555,6 +564,9 @@
                     "status",
                     "addedAt",
                     "readAt",
+                    "source",
+                    "rating",
+                    "comment",
                     "book"
                 ],
                 "properties": {
@@ -578,6 +590,34 @@
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
+                    },
+                    "source": {
+                        "description": "Null for titles added before this was tracked.",
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ReadingListSource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "nullable": true,
+                        "description": "Stars the student gave after reading, null when not rated."
+                    },
+                    "comment": {
+                        "type": "string",
+                        "maxLength": 280,
+                        "nullable": true,
+                        "description": "What the student thought of it, in their own words."
                     },
                     "book": {
                         "description": "The book, or null when it was removed from the catalog.",
@@ -683,7 +723,8 @@
                 "required": [
                     "student",
                     "profile",
-                    "readingList"
+                    "readingList",
+                    "progress"
                 ],
                 "properties": {
                     "student": {
@@ -728,6 +769,240 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/ReadingListItem"
+                        }
+                    },
+                    "progress": {
+                        "$ref": "#/components/schemas/Progress"
+                    }
+                }
+            },
+            "Badge": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "xp",
+                    "earnedAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "enum": [
+                            "firstPage",
+                            "bookworm",
+                            "readingKnight",
+                            "storyHunter",
+                            "pageBoss",
+                            "legend"
+                        ],
+                        "description": "Badge id."
+                    },
+                    "xp": {
+                        "type": "integer",
+                        "description": "XP needed for the badge."
+                    },
+                    "earnedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "When the badge was earned, null while it is not earned yet."
+                    }
+                }
+            },
+            "Progress": {
+                "type": "object",
+                "description": "XP and badges of a student.",
+                "required": [
+                    "xp",
+                    "badges",
+                    "nextBadge",
+                    "rewards"
+                ],
+                "properties": {
+                    "xp": {
+                        "type": "integer",
+                        "description": "Total XP."
+                    },
+                    "badges": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Badge"
+                        },
+                        "description": "Low to high."
+                    },
+                    "nextBadge": {
+                        "type": "object",
+                        "nullable": true,
+                        "required": [
+                            "id",
+                            "xp"
+                        ],
+                        "description": "The next badge to earn, null when every badge is earned.",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "enum": [
+                                    "firstPage",
+                                    "bookworm",
+                                    "readingKnight",
+                                    "storyHunter",
+                                    "pageBoss",
+                                    "legend"
+                                ]
+                            },
+                            "xp": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "rewards": {
+                        "type": "object",
+                        "description": "XP per action.",
+                        "required": [
+                            "profile",
+                            "added",
+                            "addedFromAdvice",
+                            "read",
+                            "rated"
+                        ],
+                        "properties": {
+                            "profile": {
+                                "type": "integer"
+                            },
+                            "added": {
+                                "type": "integer"
+                            },
+                            "addedFromAdvice": {
+                                "type": "integer"
+                            },
+                            "read": {
+                                "type": "integer"
+                            },
+                            "rated": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                }
+            },
+            "SourceCount": {
+                "type": "object",
+                "required": [
+                    "total",
+                    "read",
+                    "rated",
+                    "averageRating"
+                ],
+                "properties": {
+                    "total": {
+                        "type": "integer",
+                        "description": "Titles on the reading lists."
+                    },
+                    "read": {
+                        "type": "integer",
+                        "description": "Of which read."
+                    },
+                    "rated": {
+                        "type": "integer",
+                        "description": "Ratings given."
+                    },
+                    "averageRating": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "Average stars."
+                    }
+                }
+            },
+            "AdviceSourceStats": {
+                "type": "object",
+                "required": [
+                    "shown",
+                    "added",
+                    "read",
+                    "rated",
+                    "averageRating"
+                ],
+                "properties": {
+                    "shown": {
+                        "type": "integer",
+                        "description": "Titles Bo showed."
+                    },
+                    "added": {
+                        "type": "integer",
+                        "description": "Of which added from the advice page."
+                    },
+                    "read": {
+                        "type": "integer",
+                        "description": "Of which read."
+                    },
+                    "rated": {
+                        "type": "integer",
+                        "description": "Ratings given."
+                    },
+                    "averageRating": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "Average stars."
+                    }
+                }
+            },
+            "AdviceStats": {
+                "type": "object",
+                "description": "Whether the advice helps, over the students a teacher follows.",
+                "required": [
+                    "students",
+                    "shown",
+                    "added",
+                    "catalogAlsoSuggested",
+                    "bySource"
+                ],
+                "properties": {
+                    "students": {
+                        "type": "integer"
+                    },
+                    "shown": {
+                        "type": "integer",
+                        "description": "Different titles Bo showed."
+                    },
+                    "added": {
+                        "type": "object",
+                        "required": [
+                            "advice",
+                            "catalog",
+                            "teacher",
+                            "unknown"
+                        ],
+                        "properties": {
+                            "advice": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            },
+                            "catalog": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            },
+                            "teacher": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            },
+                            "unknown": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            }
+                        }
+                    },
+                    "catalogAlsoSuggested": {
+                        "type": "integer",
+                        "description": "Added from the catalog, while Bo had shown the title as well."
+                    },
+                    "bySource": {
+                        "type": "object",
+                        "required": [
+                            "ai",
+                            "rules"
+                        ],
+                        "properties": {
+                            "ai": {
+                                "$ref": "#/components/schemas/AdviceSourceStats"
+                            },
+                            "rules": {
+                                "$ref": "#/components/schemas/AdviceSourceStats"
+                            }
                         }
                     }
                 }
@@ -1242,6 +1517,52 @@
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/students/advice-stats": {
+            "get": {
+                "summary": "Whether the advice of Bo helps, over the students this teacher follows",
+                "tags": [
+                    "Students"
+                ],
+                "description": "How many titles Bo showed, how many ended up on reading lists (from the advice, the catalog or a teacher) and how many were read, split by AI model and rules.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Numbers about the advice.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdviceStats"
                                 }
                             }
                         }
@@ -2208,13 +2529,59 @@
                 }
             }
         },
+        "/api/progress/me": {
+            "get": {
+                "summary": "XP and badges of the logged in student",
+                "tags": [
+                    "Progress"
+                ],
+                "description": "Students earn XP for filling in the reading profile, adding titles to the reading list (more from the advice) and reading them. Every title counts once. Badges come at fixed amounts of XP.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "XP, badges and the XP per action.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Progress"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/advice": {
             "get": {
                 "summary": "Get book recommendations for the logged in student",
                 "tags": [
                     "Advice"
                 ],
-                "description": "Based on the saved reading profile and the reading list. The AI model gives the advice when the AI service is available, otherwise the rule based scoring does. Each suggestion explains why it was recommended.",
+                "description": "Based on the saved reading profile and the reading list. The AI model gives the advice when the AI service is available, otherwise the rule based scoring does. Each suggestion explains why it was recommended. Titles on the reading list are never suggested, so the advice changes when the student adds or reads titles.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -2339,6 +2706,15 @@
                                     "bookId": {
                                         "type": "string",
                                         "pattern": "^[a-f0-9]{24}$"
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "enum": [
+                                            "advice",
+                                            "catalog"
+                                        ],
+                                        "default": "catalog",
+                                        "description": "Where the student added the title: the advice page or the catalog."
                                     }
                                 }
                             }
@@ -2596,6 +2972,129 @@
                 }
             }
         },
+        "/api/reading-list/{id}/rating": {
+            "put": {
+                "summary": "Say what you thought of a title you read",
+                "tags": [
+                    "Reading list"
+                ],
+                "description": "One to five stars and an optional short comment. Can be changed later. The ratings of students with a similar profile help the advice for others.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "rating"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "rating": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 5
+                                    },
+                                    "comment": {
+                                        "type": "string",
+                                        "maxLength": 280,
+                                        "nullable": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "description": "Reading list entry id."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rated.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Rated.",
+                                    "type": "object",
+                                    "required": [
+                                        "item"
+                                    ],
+                                    "properties": {
+                                        "item": {
+                                            "$ref": "#/components/schemas/ReadingListItem"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict with the current state.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/teachers": {
             "get": {
                 "summary": "List the teachers who follow the logged in student",
@@ -2683,8 +3182,12 @@
             "description": "The personal reading list of a student."
         },
         {
+            "name": "Progress",
+            "description": "XP and badges of a student."
+        },
+        {
             "name": "Teachers",
-            "description": "A student chooses which teachers may follow them."
+            "description": "The teachers who follow a student."
         },
         {
             "name": "Students",

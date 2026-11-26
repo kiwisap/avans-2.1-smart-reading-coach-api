@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { nullableRef, ok, problems, secured, wrap } from '../openapi/helpers.js';
 import { createBookRepository } from '../repositories/bookRepository.js';
 import { createProfileRepository } from '../repositories/profileRepository.js';
+import { createXpRepository } from '../repositories/xpRepository.js';
 import { createProfileService } from '../services/profileService.js';
 import type { ProfileData } from '../profile/profileOptions.js';
 
@@ -48,6 +49,7 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
     const profileService = createProfileService({
         profileRepository: createProfileRepository(fastify.db),
         bookRepository: createBookRepository(fastify.mongo.db),
+        xpRepository: createXpRepository(fastify.db),
     });
 
     // Reading profiles belong to students.

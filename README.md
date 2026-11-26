@@ -181,12 +181,15 @@ Elk soort data staat in de opslag die er het beste bij past.
 
 **PostgreSQL** bevat de gegevens met sterke relaties, met constraints en foreign keys:
 
-| Tabel                | Inhoud                                                   |
-| -------------------- | -------------------------------------------------------- |
-| `users`              | Accounts met rol `student` of `teacher`                  |
-| `teacher_students`   | Welke leerling aan welke docent gekoppeld is             |
-| `reading_profiles`   | Het leesprofiel, één per leerling                        |
-| `reading_list_items` | De leeslijst, uniek per combinatie van leerling en titel |
+| Tabel                | Inhoud                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `users`              | Accounts met rol `student` of `teacher`                                                                           |
+| `teacher_students`   | Welke leerling aan welke docent gekoppeld is                                                                      |
+| `reading_profiles`   | Het leesprofiel, één per leerling                                                                                 |
+| `reading_list_items` | De leeslijst, uniek per combinatie van leerling en titel, met de bron (`advice`, `catalog` of `teacher`)          |
+| `book_ratings`       | Sterren (1 tot 5) en een korte opmerking per leerling en titel. Blijft bestaan als de titel van de leeslijst gaat |
+| `advice_suggestions` | Welke titels Bo een leerling liet zien, en of dat door het AI model of de regels kwam                             |
+| `xp_events`          | Verdiende XP, één regel per reden en titel, zodat niets dubbel telt                                               |
 
 **MongoDB** bevat de catalogus in de collectie `books`. Titels hebben wisselende metadata (boeken hebben een genre, artikelen alleen thema's), en dat past bij een documentdatabase. Een uniek veld `key` (genormaliseerde titel, auteur en soort) voorkomt dubbele titels bij het importeren. Een titel in de leeslijst verwijst met het Mongo id naar de catalogus. De koppeling tussen beide databases gebeurt in `readingListService`.
 
@@ -290,6 +293,10 @@ Alle paden beginnen met `/api`.
 | `GET /profile/me`, `PUT /profile/me`                                | leerling | Eigen leesprofiel lezen en opslaan                                                                                                                           |
 | `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie en redenen, plus de bron (`ai` of `rules`)                                                                            |
 | `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                                                                                     |
+| `POST /reading-list` (body `source`)                                | leerling | `source` is `advice` of `catalog` (standaard), zodat we zien of het advies helpt                                                                             |
+| `PUT /reading-list/:id/rating`                                      | leerling | Sterren en een opmerking bij een gelezen titel                                                                                                               |
+| `GET /progress/me`                                                  | leerling | XP, badges, de volgende badge en de XP per actie                                                                                                             |
+| `GET /students/advice-stats`                                        | docent   | Helpt het advies: getoonde tips, bron van de leeslijsten, gelezen, sterren, AI model tegenover regels                                                        |
 | `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                                                                                     |
 | `GET /teachers`                                                     | leerling | Docenten die aan jou gekoppeld zijn (alleen bekijken)                                                                                                        |
 | `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                                                                                        |
@@ -342,6 +349,16 @@ De regels (`advice/scoring.ts`, gewichten in `WEIGHTS`):
 2. Elke overgebleven titel krijgt punten: niveau exact (3), makkelijker niveau (1), per overeenkomend onderwerp (3), gewenste soort tekst (2), passende lengte (1) en passend bij het leesdoel (1). De catalogus heeft geen aantal bladzijden, dus de lengte wordt geschat op basis van de soort tekst.
 3. De hoogste scores worden aangeboden, maximaal vijf. Zijn er te weinig treffers, dan wordt de selectie verbreed naar alles op het niveau van de leerling, zodat er altijd minstens drie suggesties zijn.
 4. De redenen "Waarom dit bij je past" (`advice/motivation.ts`) worden alleen opgebouwd uit wat echt overeenkwam.
+
+Voor beide bronnen geldt:
+
+- **Het advies verandert mee.** Titels op de leeslijst (gelezen of bewaard) komen nooit in het advies. Het AI model laat ze zelf al weg, de API filtert ze daarna nog een keer, ook als het model de key niet kende.
+- **Sterren van vergelijkbare leerlingen tellen mee.** Na het lezen vraagt Bo om een beoordeling. Ratings van andere leerlingen met hetzelfde leesniveau en minstens één gedeeld onderwerp (`ratingRepository.peerRatings`) tellen vanaf twee stemmen mee. Bij de regels schuift een titel op met `(gemiddelde - 3) x 1,5` punten. Bij beide bronnen valt een titel onder de twee sterren af, en vanaf 3,5 sterren noemt Bo het als reden. De eigen sterren gaan als `rating` mee in de geschiedenis naar het AI model.
+- **Meten of het helpt.** Elke getoonde tip wordt bewaard in `advice_suggestions`, niet als een docent het advies bekijkt. Met de bron op de leeslijst en de sterren berekent `adviceStatsService` hoeveel tips op een leeslijst komen, gelezen worden en hoe ze scoren, apart voor AI en regels.
+
+## Game: XP en badges
+
+Leerlingen verdienen XP (`progress/xp.ts`): leesprofiel invullen 50, titel uit de catalogus op de leeslijst 10, tip van Bo op de leeslijst 15, titel uitlezen 40 en beoordelen 10. Elke reden telt één keer per titel, dus toevoegen en weer verwijderen of opnieuw op gelezen zetten levert niets extra op. Badges komen bij 50, 150, 300, 500, 800 en 1200 XP. Een titel die een docent toevoegt geeft geen XP, die verdient de leerling pas door hem te lezen. Migratie `0004_reading_game` geeft bestaande leerlingen de XP voor wat ze al gedaan hadden.
 
 ## Tests
 

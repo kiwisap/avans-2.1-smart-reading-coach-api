@@ -4,6 +4,12 @@ import { createBookRepository } from '../repositories/bookRepository.js';
 import { createProfileRepository } from '../repositories/profileRepository.js';
 import { createReadingListRepository } from '../repositories/readingListRepository.js';
 import { createUserRepository } from '../repositories/userRepository.js';
+import { createAdviceStatsRepository } from '../repositories/adviceStatsRepository.js';
+import { createSuggestionRepository } from '../repositories/suggestionRepository.js';
+import { createXpRepository } from '../repositories/xpRepository.js';
+import { createRatingRepository } from '../repositories/ratingRepository.js';
+import { createAdviceStatsService } from '../services/adviceStatsService.js';
+import { createProgressService } from '../services/progressService.js';
 import { createAdviceService } from '../services/adviceService.js';
 import { createReadingListService } from '../services/readingListService.js';
 import {
@@ -25,6 +31,19 @@ const listSchema = {
     security: secured,
     response: {
         200: wrap('students', 'StudentSummary', 'Linked students.', true),
+        ...problems(401, 403),
+    },
+};
+
+const statsSchema = {
+    tags: ['Students'],
+    summary: 'Whether the advice of Bo helps, over the students this teacher follows',
+    description:
+        'How many titles Bo showed, how many ended up on reading lists (from the advice, the ' +
+        'catalog or a teacher) and how many were read, split by AI model and rules.',
+    security: secured,
+    response: {
+        200: ok('AdviceStats', 'Numbers about the advice.'),
         ...problems(401, 403),
     },
 };
@@ -114,11 +133,20 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
     const bookRepository = createBookRepository(fastify.mongo.db);
     const profileRepository = createProfileRepository(fastify.db);
     const readingListRepository = createReadingListRepository(fastify.db);
-    const readingListService = createReadingListService({ readingListRepository, bookRepository });
+    const xpRepository = createXpRepository(fastify.db);
+    const ratingRepository = createRatingRepository(fastify.db);
+    const readingListService = createReadingListService({
+        readingListRepository,
+        bookRepository,
+        xpRepository,
+        ratingRepository,
+    });
     const adviceService = createAdviceService({
         profileRepository,
         bookRepository,
         readingListRepository,
+        suggestionRepository: createSuggestionRepository(fastify.db),
+        ratingRepository,
         aiClient: fastify.ai,
     });
     const userRepository = createUserRepository(fastify.db);
@@ -128,6 +156,11 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
         profileRepository,
         readingListService,
         adviceService,
+        progressService: createProgressService({ xpRepository }),
+    });
+    const statsService = createAdviceStatsService({
+        adviceStatsRepository: createAdviceStatsRepository(fastify.db),
+        userRepository,
     });
 
     // Teachers only. Access to a specific student is checked again in the service.
@@ -136,6 +169,10 @@ export default async function studentRoutes(fastify: FastifyInstance): Promise<v
     fastify.get('/students', { preHandler, schema: listSchema }, async (request) => ({
         students: await teacherService.listStudents(request.user.sub),
     }));
+
+    fastify.get('/students/advice-stats', { preHandler, schema: statsSchema }, async (request) =>
+        statsService.getStats(request.user.sub),
+    );
 
     // A teacher looks up a student and links themselves to them.
     fastify.get<{ Querystring: { search: string } }>(

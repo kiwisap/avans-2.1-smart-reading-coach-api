@@ -1,3 +1,4 @@
+import type { BookRating } from '../entities/bookRating.js';
 import type { WithId } from 'mongodb';
 import type { BookDto } from '../dto/bookDto.js';
 import type { ProfileDto } from '../dto/profileDto.js';
@@ -44,6 +45,7 @@ export function toBookDto(doc: WithId<Book>): BookDto {
 export function toReadingListItemDto(
     item: ReadingListItem,
     book: BookDto | null | undefined,
+    rating?: Pick<BookRating, 'rating' | 'comment'> | null,
 ): ReadingListItemDto {
     return {
         id: item.id,
@@ -51,6 +53,9 @@ export function toReadingListItemDto(
         status: item.status,
         addedAt: item.addedAt,
         readAt: item.readAt,
+        source: item.source,
+        rating: rating?.rating ?? null,
+        comment: rating?.comment ?? null,
         book: book ?? null,
     };
 }

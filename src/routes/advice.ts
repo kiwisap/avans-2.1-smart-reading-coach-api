@@ -3,6 +3,8 @@ import { ok, problems, secured } from '../openapi/helpers.js';
 import { createBookRepository } from '../repositories/bookRepository.js';
 import { createProfileRepository } from '../repositories/profileRepository.js';
 import { createReadingListRepository } from '../repositories/readingListRepository.js';
+import { createRatingRepository } from '../repositories/ratingRepository.js';
+import { createSuggestionRepository } from '../repositories/suggestionRepository.js';
 import { createAdviceService } from '../services/adviceService.js';
 
 export default async function adviceRoutes(fastify: FastifyInstance): Promise<void> {
@@ -10,6 +12,8 @@ export default async function adviceRoutes(fastify: FastifyInstance): Promise<vo
         profileRepository: createProfileRepository(fastify.db),
         bookRepository: createBookRepository(fastify.mongo.db),
         readingListRepository: createReadingListRepository(fastify.db),
+        suggestionRepository: createSuggestionRepository(fastify.db),
+        ratingRepository: createRatingRepository(fastify.db),
         aiClient: fastify.ai,
     });
 
@@ -19,7 +23,8 @@ export default async function adviceRoutes(fastify: FastifyInstance): Promise<vo
         description:
             'Based on the saved reading profile and the reading list. The AI model gives the advice ' +
             'when the AI service is available, otherwise the rule based scoring does. Each suggestion ' +
-            'explains why it was recommended.',
+            'explains why it was recommended. Titles on the reading list are never suggested, so the ' +
+            'advice changes when the student adds or reads titles.',
         security: secured,
         response: {
             200: ok(

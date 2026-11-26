@@ -39,7 +39,8 @@
         "readingList": {
             "bookNotInCatalog": "Deze titel staat niet in de catalogus",
             "alreadyOnList": "Deze titel staat al op je leeslijst",
-            "itemNotFound": "Leeslijstitem niet gevonden"
+            "itemNotFound": "Leeslijstitem niet gevonden",
+            "rateAfterReading": "Je kunt een titel pas beoordelen als je hem gelezen hebt"
         },
         "students": {
             "notLinked": "Je bent niet aan deze leerling gekoppeld",
@@ -55,6 +56,8 @@
         "infix": "tussenvoegsel",
         "lastName": "achternaam",
         "search": "zoekterm",
+        "rating": "beoordeling",
+        "comment": "opmerking",
         "languageLevel": "leesniveau",
         "materialTypes": "soorten teksten",
         "topics": "onderwerpen",
@@ -90,6 +93,7 @@
             "levelEasier": "Het is iets makkelijker dan jouw niveau ({{level}}), dus het leest lekker weg.",
             "materialType": "Het is een {{type}}, een van de soorten teksten die je leuk vindt.",
             "length": "De lengte past bij je wens voor een {{length}} tekst.",
+            "peers": "Leerlingen met een profiel zoals jij gaven dit gemiddeld {{stars}} van de 5 sterren.",
             "fallback": "Een goede keuze op jouw leesniveau."
         },
         "description": {

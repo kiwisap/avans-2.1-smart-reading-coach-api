@@ -20,6 +20,8 @@ export interface ProblemDetails {
 const KNOWN_FIELDS = new Set([
     'email',
     'search',
+    'rating',
+    'comment',
     'password',
     'currentPassword',
     'newPassword',

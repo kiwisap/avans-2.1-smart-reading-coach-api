@@ -29,6 +29,13 @@
       "when": 1795706374183,
       "tag": "0003_split_user_name",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795710623714,
+      "tag": "0004_reading_game",
+      "breakpoints": true
     }
   ]
 }

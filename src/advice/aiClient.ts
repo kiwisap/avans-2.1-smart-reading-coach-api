@@ -10,6 +10,7 @@ import type { ReadingStatus } from '../readingList/statuses.js';
 export interface AiHistoryItem {
     key: string;
     status: ReadingStatus;
+    rating?: number; // 1 to 5 stars the student gave, the model weighs it in
 }
 
 // One recommendation as the AI service returns it.
