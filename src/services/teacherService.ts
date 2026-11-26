@@ -5,6 +5,7 @@ import type { ReadingListItemDto } from '../dto/readingListItemDto.js';
 import type { StudentOverviewDto } from '../dto/studentOverviewDto.js';
 import { toProfileDto } from './mappingService.js';
 import type { AdviceService } from './adviceService.js';
+import type { ProgressService } from './progressService.js';
 import type { ReadingListService } from './readingListService.js';
 import type { ProfileRepository } from '../repositories/profileRepository.js';
 import type { UserRepository } from '../repositories/userRepository.js';
@@ -14,6 +15,7 @@ interface Deps {
     profileRepository: Pick<ProfileRepository, 'findByUserId'>;
     readingListService: Pick<ReadingListService, 'list' | 'add'>;
     adviceService: Pick<AdviceService, 'getAdvice'>;
+    progressService: Pick<ProgressService, 'getProgress'>;
 }
 
 // What a teacher may do with the students linked to them (FR6).
@@ -22,6 +24,7 @@ export function createTeacherService({
     profileRepository,
     readingListService,
     adviceService,
+    progressService,
 }: Deps) {
     // Every student specific action goes through this check, so a teacher only ever sees linked students.
     async function assertLinked(teacherId: string, studentId: string): Promise<void> {
@@ -43,14 +46,16 @@ export function createTeacherService({
             const student = await userRepository.findById(studentId);
             if (!student) throw new HttpError(404, 'students.notFound');
 
-            const [profile, readingList] = await Promise.all([
+            const [profile, readingList, progress] = await Promise.all([
                 profileRepository.findByUserId(studentId),
                 readingListService.list(studentId),
+                progressService.getProgress(studentId),
             ]);
             return {
                 student: { id: student.id, name: student.name, email: student.email },
                 profile: toProfileDto(profile),
                 readingList,
+                progress,
             };
         },
 
@@ -61,7 +66,7 @@ export function createTeacherService({
             locale?: Locale,
         ): Promise<AdviceDto> {
             await assertLinked(teacherId, studentId);
-            return adviceService.getAdvice(studentId, locale);
+            return adviceService.getAdvice(studentId, locale, { record: false });
         },
 
         async addToStudentReadingList(
@@ -70,7 +75,7 @@ export function createTeacherService({
             bookId: string,
         ): Promise<ReadingListItemDto> {
             await assertLinked(teacherId, studentId);
-            return readingListService.add(studentId, bookId);
+            return readingListService.add(studentId, bookId, 'teacher');
         },
     };
 }

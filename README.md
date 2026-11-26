@@ -72,7 +72,7 @@ Het bestand `.env` staat in `.gitignore` en wordt nooit gecommit.
 
 ### Opnieuw beginnen
 
-`docker compose down -v` verwijdert de containers en beide databases. Draai daarna stap 3 en 4 opnieuw. `npm run import:catalog` mag je vaker draaien: bestaande titels worden bijgewerkt in plaats van dubbel opgeslagen.
+`docker compose down -v` verwijdert de containers en beide databases. Draai daarna stap 3 en 4 opnieuw. `npm run import:catalog` mag je vaker draaien: bestaande titels worden bijgewerkt in plaats van dubbel opgeslagen. Staat `AI_SERVICE_URL` in `.env`, dan vraagt de import de AI service daarna om een nieuw model op de nieuwe catalogus.
 
 ## Scripts
 
@@ -181,14 +181,21 @@ Elk soort data staat in de opslag die er het beste bij past.
 
 **PostgreSQL** bevat de gegevens met sterke relaties, met constraints en foreign keys:
 
-| Tabel                | Inhoud                                                   |
-| -------------------- | -------------------------------------------------------- |
-| `users`              | Accounts met rol `student` of `teacher`                  |
-| `teacher_students`   | Welke leerling aan welke docent gekoppeld is             |
-| `reading_profiles`   | Het leesprofiel, één per leerling                        |
-| `reading_list_items` | De leeslijst, uniek per combinatie van leerling en titel |
+| Tabel                | Inhoud                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `users`              | Accounts met rol `student` of `teacher`                                                                           |
+| `teacher_students`   | Welke leerling aan welke docent gekoppeld is                                                                      |
+| `reading_profiles`   | Het leesprofiel, één per leerling                                                                                 |
+| `reading_list_items` | De leeslijst, uniek per combinatie van leerling en titel, met de bron (`advice`, `catalog` of `teacher`)          |
+| `book_ratings`       | Sterren (1 tot 5) en een korte opmerking per leerling en titel. Blijft bestaan als de titel van de leeslijst gaat |
+| `advice_suggestions` | Welke titels Bo een leerling liet zien, en of dat door het AI model of de regels kwam                             |
+| `xp_events`          | Verdiende XP, één regel per reden en titel, zodat niets dubbel telt                                               |
 
 **MongoDB** bevat de catalogus in de collectie `books`. Titels hebben wisselende metadata (boeken hebben een genre, artikelen alleen thema's), en dat past bij een documentdatabase. Een uniek veld `key` (genormaliseerde titel, auteur en soort) voorkomt dubbele titels bij het importeren. Een titel in de leeslijst verwijst met het Mongo id naar de catalogus. De koppeling tussen beide databases gebeurt in `readingListService`.
+
+Bij elk boek bewaart de import ook de originele rij(en) uit de spreadsheet in `sources`, met alle kolommen. De API stuurt dat veld nooit mee; het is voor de AI service, die de catalogus uit MongoDB leest en daarop traint. Staat een titel twee keer in de sheet, dan toont de app hem één keer en bewaart `sources` beide rijen.
+
+De collectie `topic_synonyms` is van de AI service: na elke training schrijft die per onderwerp de thema's met dezelfde of een nauwere betekenis, geleerd uit de Open Multilingual Wordnet (bijvoorbeeld _maatschappij_ en _samenleving_). De API leest hem alleen, voor de regels van het advies.
 
 ### ERD
 
@@ -204,7 +211,10 @@ erDiagram
         uuid id PK
         text email UK
         text password_hash
-        text name
+        text name "weergavenaam"
+        text first_name
+        text infix "tussenvoegsel, optioneel"
+        text last_name
         user_role role "student of teacher"
         timestamptz created_at
     }
@@ -266,7 +276,7 @@ Wijzig je een route of schema, draai dan `npm run openapi` en commit `openapi.js
 - Inloggen levert een JWT met het gebruikers id (`sub`) en de rol.
 - Elke route behalve registreren, inloggen en de health check vraagt een geldig token via `fastify.authenticate`.
 - Routes die alleen voor één rol zijn, gebruiken `fastify.authorize('student')` of `fastify.authorize('teacher')`.
-- Een docent ziet alleen leerlingen die zichzelf aan die docent hebben gekoppeld. Dat wordt in `teacherService` afgedwongen en geeft anders een 403.
+- Een docent koppelt zichzelf aan een leerling en ziet alleen leerlingen aan wie hij gekoppeld is. Dat wordt in `teacherService` afgedwongen en geeft anders een 403.
 
 ## API overzicht
 
@@ -277,6 +287,9 @@ Alle paden beginnen met `/api`.
 | `POST /auth/register`                                               | iedereen | Account aanmaken (rol leerling)                                                                                                                              |
 | `POST /auth/login`                                                  | iedereen | Inloggen, geeft een token                                                                                                                                    |
 | `GET /auth/me`                                                      | ingelogd | Huidige gebruiker                                                                                                                                            |
+| `PATCH /auth/me`                                                    | ingelogd | Voornaam, tussenvoegsel, achternaam of e-mailadres wijzigen (een nieuw e-mailadres vraagt het huidige wachtwoord)                                            |
+| `PUT /auth/me/password`                                             | ingelogd | Wachtwoord wijzigen met het huidige wachtwoord                                                                                                               |
+| `DELETE /auth/me`                                                   | ingelogd | Account verwijderen met het huidige wachtwoord, samen met leesprofiel, leeslijst en koppelingen met docenten                                                 |
 | `GET /books`                                                        | ingelogd | Catalogus met zoeken, filters en paginering (`search`, `type`, `level`, `theme` (elk herhaalbaar, bijvoorbeeld `theme=humor&theme=oorlog`), `page`, `limit`) |
 | `GET /books/filters`                                                | ingelogd | Beschikbare waarden voor de filters                                                                                                                          |
 | `GET /books/:id`                                                    | ingelogd | Eén titel                                                                                                                                                    |
@@ -284,10 +297,15 @@ Alle paden beginnen met `/api`.
 | `GET /profile/me`, `PUT /profile/me`                                | leerling | Eigen leesprofiel lezen en opslaan                                                                                                                           |
 | `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie en redenen, plus de bron (`ai` of `rules`)                                                                            |
 | `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                                                                                     |
+| `POST /reading-list` (body `source`)                                | leerling | `source` is `advice` of `catalog` (standaard), zodat we zien of het advies helpt                                                                             |
+| `PUT /reading-list/:id/rating`                                      | leerling | Sterren en een opmerking bij een gelezen titel                                                                                                               |
+| `GET /progress/me`                                                  | leerling | XP, badges, de volgende badge en de XP per actie                                                                                                             |
+| `GET /students/advice-stats`                                        | docent   | Helpt het advies: getoonde tips, bron van de leeslijsten, gelezen, sterren, AI model tegenover regels                                                        |
 | `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                                                                                     |
-| `GET /teachers`                                                     | leerling | Docenten en of je aan ze gekoppeld bent                                                                                                                      |
-| `PUT /teachers/:teacherId/link`, `DELETE /teachers/:teacherId/link` | leerling | Koppelen en ontkoppelen                                                                                                                                      |
+| `GET /teachers`                                                     | leerling | Docenten die aan jou gekoppeld zijn (alleen bekijken)                                                                                                        |
 | `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                                                                                        |
+| `GET /students/search?search=`                                      | docent   | Leerlingen zoeken op naam of e-mailadres (minimaal 2 tekens, maximaal 20 resultaten), met of je al gekoppeld bent                                            |
+| `PUT /students/:studentId/link`, `DELETE /students/:studentId/link` | docent   | Jezelf aan een leerling koppelen en weer ontkoppelen                                                                                                         |
 | `GET /students/:studentId`                                          | docent   | Leesprofiel en leeslijst van een gekoppelde leerling                                                                                                         |
 | `GET /students/:studentId/advice`                                   | docent   | Het leesadvies van een gekoppelde leerling (hetzelfde als wat de leerling ziet)                                                                              |
 | `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                                                                                        |
@@ -317,7 +335,7 @@ Clients reageren op `status`, niet op de tekst. De codes hieronder zijn intern e
 | `advice.profileRequired`                                                        | 409           | Eerst het leesprofiel invullen                                                         |
 | `profile.tooManyTopics` (`max`), `profile.unknownTopics` (`topics`)             | 400           | Te veel of onbekende onderwerpen                                                       |
 | `readingList.bookNotInCatalog`, `alreadyOnList`, `itemNotFound`                 | 404, 409, 404 | Titel onbekend, al op de lijst, item niet gevonden                                     |
-| `teachers.notFound`, `students.notLinked`, `students.notFound`                  | 404, 403, 404 | Docent of leerling onbekend, leerling niet gekoppeld                                   |
+| `students.notLinked`, `students.notFound`                                       | 403, 404      | Leerling niet gekoppeld, leerling onbekend                                             |
 | `validation.required` (`field`), `invalidFormat`, `empty`, `tooLong`, `invalid` | 400           | Ongeldige invoer, `field` is de naam van het veld in het verzoek, bijvoorbeeld `email` |
 | `validation.invalidEmail`, `validation.passwordTooShort` (`min`)                | 400           | Ongeldig e-mailadres, te kort wachtwoord                                               |
 | `generic.badRequest`, `generic.notFound`, `generic.server`                      | 400, 404, 500 | Kapot verzoek, onbekende route, onverwachte fout (zonder technische details)           |
@@ -326,15 +344,27 @@ Clients reageren op `status`, niet op de tekst. De codes hieronder zijn intern e
 
 Het advies komt van het AI model, met de regels als vangnet. De logica staat in `services/adviceService.ts`.
 
-1. **AI model.** De API stuurt het leesprofiel en de leeslijst (als catalogus keys) naar de AI service (`advice/aiClient.ts`). Het model in `smart-reading-coach-ai` combineert niveau, soort tekst, genre, leestijd, tekstovereenkomst met de onderwerpen en de smaak van vergelijkbare leerlingen, en geeft vijf titels met redenen terug. Titels die al op de leeslijst staan worden niet opnieuw aangeraden. De API zoekt de titels op in MongoDB via hun `key`. Het antwoord heeft `source: "ai"`.
+1. **AI model.** De API stuurt het leesprofiel en de leeslijst (als catalogus keys) naar de AI service (`advice/aiClient.ts`). Het model in `smart-reading-coach-ai` combineert niveau, soort tekst, genre, leestijd, tekstovereenkomst met de onderwerpen en de smaak van vergelijkbare leerlingen, en geeft vijf titels terug, elk met een kort verhaaltje van Bo (`motivation`) en de losse redenen erachter (`reasons`). Titels die al op de leeslijst staan worden niet opnieuw aangeraden. De API zoekt de titels op in MongoDB via hun `key`. Het antwoord heeft `source: "ai"`.
 2. **Regels als vangnet.** Is `AI_SERVICE_URL` niet ingesteld, antwoordt de service niet binnen `AI_TIMEOUT_MS`, geeft hij een fout of staan er minder dan drie van de titels in de catalogus, dan gebruikt de API de regels. Het antwoord heeft dan `source: "rules"`.
 
 De regels (`advice/scoring.ts`, gewichten in `WEIGHTS`):
 
 1. Titels die moeilijker zijn dan het niveau van de leerling vallen af.
-2. Elke overgebleven titel krijgt punten: niveau exact (3), makkelijker niveau (1), per overeenkomend onderwerp (3), gewenste soort tekst (2), passende lengte (1) en passend bij het leesdoel (1). De catalogus heeft geen aantal bladzijden, dus de lengte wordt geschat op basis van de soort tekst.
+2. Elke overgebleven titel krijgt punten: niveau exact (3), makkelijker niveau (1), per overeenkomend onderwerp (3; een onderwerp past ook bij een thema dat de AI service als synoniem of nauwere betekenis leerde, uit `topic_synonyms`), gewenste soort tekst (2), passende lengte (1) en passend bij het leesdoel (1). De catalogus heeft geen aantal bladzijden, dus de lengte wordt geschat op basis van de soort tekst.
 3. De hoogste scores worden aangeboden, maximaal vijf. Zijn er te weinig treffers, dan wordt de selectie verbreed naar alles op het niveau van de leerling, zodat er altijd minstens drie suggesties zijn.
-4. De redenen "Waarom dit bij je past" (`advice/motivation.ts`) worden alleen opgebouwd uit wat echt overeenkwam.
+4. "Waarom dit bij je past" (`advice/motivation.ts`) is een kort verhaaltje met een opening (de onderwerpen of het leesdoel), een middenstuk (soort tekst, niveau en lengte) en een afsluiter. Elke zin komt uit iets dat echt overeenkwam; de zinnen staan in `src/locales/nl.json` onder `advice.story`. De losse redenen staan in `reasons`, voor de docent.
+
+Voor beide bronnen geldt:
+
+- **Het advies verandert mee.** Titels op de leeslijst (gelezen of bewaard) komen nooit in het advies. Het AI model laat ze zelf al weg, de API filtert ze daarna nog een keer, ook als het model de key niet kende.
+- **Sterren van vergelijkbare leerlingen tellen mee.** Na het lezen vraagt Bo om een beoordeling. Ratings van andere leerlingen met hetzelfde leesniveau en minstens één gedeeld onderwerp (`ratingRepository.peerRatings`) tellen vanaf twee stemmen mee. Bij de regels schuift een titel op met `(gemiddelde - 3) x 1,5` punten. Bij beide bronnen valt een titel onder de twee sterren af, en vanaf 3,5 sterren sluit Bo het verhaaltje af met de sterren van die leerlingen. De eigen sterren gaan als `rating` mee in de geschiedenis naar het AI model.
+- **Meten of het helpt.** Elke getoonde tip wordt bewaard in `advice_suggestions`, niet als een docent het advies bekijkt. Met de bron op de leeslijst en de sterren berekent `adviceStatsService` hoeveel tips op een leeslijst komen, gelezen worden en hoe ze scoren, apart voor AI en regels.
+
+## Game: XP en badges
+
+In de app heten XP **veren**: Bo is een uil, en leerlingen verzamelen zijn veren. In de code en de API heet het `xp`.
+
+Leerlingen verdienen XP (`progress/xp.ts`): leesprofiel invullen 50, titel uit de catalogus op de leeslijst 10, tip van Bo op de leeslijst 15, titel uitlezen 40 en beoordelen 10. Elke reden telt één keer per titel, dus toevoegen en weer verwijderen of opnieuw op gelezen zetten levert niets extra op. Badges komen bij 50, 150, 300, 500, 800 en 1200 XP. Een titel die een docent toevoegt geeft geen XP, die verdient de leerling pas door hem te lezen. Migratie `0004_reading_game` geeft bestaande leerlingen de XP voor wat ze al gedaan hadden.
 
 ## Tests
 
@@ -347,11 +377,12 @@ De unit tests dekken de kernlogica, zonder database:
 | Bestand                      | Wat wordt getest                                                                                                                                                                                         |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scoring.test.ts`            | Puntentelling, te moeilijke titels, motivatietekst en het randgeval van een titel zonder niveau                                                                                                          |
+| `accountService.test.ts`     | Naam in delen (voornaam, tussenvoegsel, achternaam) wijzigen, e-mailadres alleen met het huidige wachtwoord, bezet e-mailadres, wachtwoord wijzigen, account verwijderen, verwijderd account             |
 | `adviceService.test.ts`      | Eerst een profiel invullen, beste treffer bovenaan, minstens drie suggesties, nooit een te moeilijke titel, AI advies in de volgorde van het model, leeslijst als geschiedenis, terugvallen op de regels |
 | `aiClient.test.ts`           | Verzoek naar de AI service (profiel, geschiedenis, API sleutel), null bij een fout, time out of vreemd antwoord, health check                                                                            |
 | `profileService.test.ts`     | Opslaan van het profiel, dubbele waarden, onbekende onderwerpen, meer dan vijf onderwerpen                                                                                                               |
 | `readingListService.test.ts` | Toevoegen, dubbele of onbekende titels, sortering, verwijderde catalogustitels, niet bij andermans item kunnen, gelezen of ongelezen zetten                                                              |
-| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar (ook hun advies), koppelen en ontkoppelen van docenten                                                                                         |
+| `teacherService.test.ts`     | Alleen gekoppelde leerlingen zijn zichtbaar en bewerkbaar (ook hun advies), docenten koppelen zichzelf aan leerlingen en zoeken alleen leerlingen                                                        |
 | `errorHandler.test.ts`       | Foutantwoorden als problem details in de taal van het verzoek, ongeldige invoer, onbekende route, geen technische details bij een crash                                                                  |
 | `i18n.test.ts`               | Teksten ophalen en invullen, taal kiezen uit `Accept-Language`, geen lege teksten in `nl.json`, veldnamen bij validatiefouten                                                                            |
 | `openapi.test.ts`            | Elke route staat in de specificatie met tag, samenvatting en beveiliging, `openapi.json` is actueel, DTO's en antwoorden passen bij de schema's, fouten zijn problem details                             |

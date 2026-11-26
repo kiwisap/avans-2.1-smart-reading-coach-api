@@ -5,6 +5,7 @@ import authRoutes from './auth.js';
 import bookRoutes from './books.js';
 import healthRoutes from './health.js';
 import profileRoutes from './profile.js';
+import progressRoutes from './progress.js';
 import readingListRoutes from './readingList.js';
 import studentRoutes from './students.js';
 import teacherRoutes from './teachers.js';
@@ -16,6 +17,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     await app.register(studentRoutes, { prefix: API_PREFIX });
     await app.register(bookRoutes, { prefix: API_PREFIX });
     await app.register(profileRoutes, { prefix: API_PREFIX });
+    await app.register(progressRoutes, { prefix: API_PREFIX });
     await app.register(adviceRoutes, { prefix: API_PREFIX });
     await app.register(readingListRoutes, { prefix: API_PREFIX });
     await app.register(teacherRoutes, { prefix: API_PREFIX });

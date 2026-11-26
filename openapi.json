@@ -69,6 +69,15 @@
                 ],
                 "description": "Whether the student has read the title."
             },
+            "ReadingListSource": {
+                "type": "string",
+                "enum": [
+                    "advice",
+                    "catalog",
+                    "teacher"
+                ],
+                "description": "Where a title on the reading list came from: the advice page, the catalog or a teacher."
+            },
             "ProblemDetails": {
                 "type": "object",
                 "description": "Error response according to RFC 9457 (application/problem+json).",
@@ -108,6 +117,9 @@
                     "id",
                     "email",
                     "name",
+                    "firstName",
+                    "infix",
+                    "lastName",
                     "role"
                 ],
                 "properties": {
@@ -123,7 +135,20 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Display name."
+                        "description": "Display name: first name, infix and last name together."
+                    },
+                    "firstName": {
+                        "type": "string",
+                        "description": "Voornaam."
+                    },
+                    "infix": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Tussenvoegsel, for example \"van der\". Null when there is none."
+                    },
+                    "lastName": {
+                        "type": "string",
+                        "description": "Achternaam."
                     },
                     "role": {
                         "$ref": "#/components/schemas/Role"
@@ -539,6 +564,9 @@
                     "status",
                     "addedAt",
                     "readAt",
+                    "source",
+                    "rating",
+                    "comment",
                     "book"
                 ],
                 "properties": {
@@ -563,6 +591,34 @@
                         "format": "date-time",
                         "nullable": true
                     },
+                    "source": {
+                        "description": "Null for titles added before this was tracked.",
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ReadingListSource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "nullable": true,
+                        "description": "Stars the student gave after reading, null when not rated."
+                    },
+                    "comment": {
+                        "type": "string",
+                        "maxLength": 280,
+                        "nullable": true,
+                        "description": "What the student thought of it, in their own words."
+                    },
                     "book": {
                         "description": "The book, or null when it was removed from the catalog.",
                         "anyOf": [
@@ -580,12 +636,12 @@
                     }
                 }
             },
-            "TeacherLink": {
+            "LinkedTeacher": {
                 "type": "object",
                 "required": [
                     "id",
                     "name",
-                    "linked"
+                    "email"
                 ],
                 "properties": {
                     "id": {
@@ -597,9 +653,39 @@
                         "type": "string",
                         "description": "Teacher name."
                     },
+                    "email": {
+                        "type": "string",
+                        "description": "Teacher email address.",
+                        "format": "email"
+                    }
+                }
+            },
+            "StudentLink": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "linked"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Student id.",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Student name."
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Student email address.",
+                        "format": "email"
+                    },
                     "linked": {
                         "type": "boolean",
-                        "description": "Whether this teacher can see the student."
+                        "description": "Whether this teacher follows the student."
                     }
                 }
             },
@@ -637,7 +723,8 @@
                 "required": [
                     "student",
                     "profile",
-                    "readingList"
+                    "readingList",
+                    "progress"
                 ],
                 "properties": {
                     "student": {
@@ -682,6 +769,240 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/ReadingListItem"
+                        }
+                    },
+                    "progress": {
+                        "$ref": "#/components/schemas/Progress"
+                    }
+                }
+            },
+            "Badge": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "xp",
+                    "earnedAt"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "enum": [
+                            "firstPage",
+                            "bookworm",
+                            "readingKnight",
+                            "storyHunter",
+                            "pageBoss",
+                            "legend"
+                        ],
+                        "description": "Badge id."
+                    },
+                    "xp": {
+                        "type": "integer",
+                        "description": "XP needed for the badge."
+                    },
+                    "earnedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "When the badge was earned, null while it is not earned yet."
+                    }
+                }
+            },
+            "Progress": {
+                "type": "object",
+                "description": "XP and badges of a student.",
+                "required": [
+                    "xp",
+                    "badges",
+                    "nextBadge",
+                    "rewards"
+                ],
+                "properties": {
+                    "xp": {
+                        "type": "integer",
+                        "description": "Total XP."
+                    },
+                    "badges": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Badge"
+                        },
+                        "description": "Low to high."
+                    },
+                    "nextBadge": {
+                        "type": "object",
+                        "nullable": true,
+                        "required": [
+                            "id",
+                            "xp"
+                        ],
+                        "description": "The next badge to earn, null when every badge is earned.",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "enum": [
+                                    "firstPage",
+                                    "bookworm",
+                                    "readingKnight",
+                                    "storyHunter",
+                                    "pageBoss",
+                                    "legend"
+                                ]
+                            },
+                            "xp": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "rewards": {
+                        "type": "object",
+                        "description": "XP per action.",
+                        "required": [
+                            "profile",
+                            "added",
+                            "addedFromAdvice",
+                            "read",
+                            "rated"
+                        ],
+                        "properties": {
+                            "profile": {
+                                "type": "integer"
+                            },
+                            "added": {
+                                "type": "integer"
+                            },
+                            "addedFromAdvice": {
+                                "type": "integer"
+                            },
+                            "read": {
+                                "type": "integer"
+                            },
+                            "rated": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                }
+            },
+            "SourceCount": {
+                "type": "object",
+                "required": [
+                    "total",
+                    "read",
+                    "rated",
+                    "averageRating"
+                ],
+                "properties": {
+                    "total": {
+                        "type": "integer",
+                        "description": "Titles on the reading lists."
+                    },
+                    "read": {
+                        "type": "integer",
+                        "description": "Of which read."
+                    },
+                    "rated": {
+                        "type": "integer",
+                        "description": "Ratings given."
+                    },
+                    "averageRating": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "Average stars."
+                    }
+                }
+            },
+            "AdviceSourceStats": {
+                "type": "object",
+                "required": [
+                    "shown",
+                    "added",
+                    "read",
+                    "rated",
+                    "averageRating"
+                ],
+                "properties": {
+                    "shown": {
+                        "type": "integer",
+                        "description": "Titles Bo showed."
+                    },
+                    "added": {
+                        "type": "integer",
+                        "description": "Of which added from the advice page."
+                    },
+                    "read": {
+                        "type": "integer",
+                        "description": "Of which read."
+                    },
+                    "rated": {
+                        "type": "integer",
+                        "description": "Ratings given."
+                    },
+                    "averageRating": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "Average stars."
+                    }
+                }
+            },
+            "AdviceStats": {
+                "type": "object",
+                "description": "Whether the advice helps, over the students a teacher follows.",
+                "required": [
+                    "students",
+                    "shown",
+                    "added",
+                    "catalogAlsoSuggested",
+                    "bySource"
+                ],
+                "properties": {
+                    "students": {
+                        "type": "integer"
+                    },
+                    "shown": {
+                        "type": "integer",
+                        "description": "Different titles Bo showed."
+                    },
+                    "added": {
+                        "type": "object",
+                        "required": [
+                            "advice",
+                            "catalog",
+                            "teacher",
+                            "unknown"
+                        ],
+                        "properties": {
+                            "advice": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            },
+                            "catalog": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            },
+                            "teacher": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            },
+                            "unknown": {
+                                "$ref": "#/components/schemas/SourceCount"
+                            }
+                        }
+                    },
+                    "catalogAlsoSuggested": {
+                        "type": "integer",
+                        "description": "Added from the catalog, while Bo had shown the title as well."
+                    },
+                    "bySource": {
+                        "type": "object",
+                        "required": [
+                            "ai",
+                            "rules"
+                        ],
+                        "properties": {
+                            "ai": {
+                                "$ref": "#/components/schemas/AdviceSourceStats"
+                            },
+                            "rules": {
+                                "$ref": "#/components/schemas/AdviceSourceStats"
+                            }
                         }
                     }
                 }
@@ -757,7 +1078,8 @@
                                 "required": [
                                     "email",
                                     "password",
-                                    "name"
+                                    "firstName",
+                                    "lastName"
                                 ],
                                 "additionalProperties": false,
                                 "properties": {
@@ -771,10 +1093,22 @@
                                         "minLength": 8,
                                         "maxLength": 72
                                     },
-                                    "name": {
+                                    "firstName": {
                                         "type": "string",
                                         "minLength": 1,
-                                        "maxLength": 100
+                                        "maxLength": 60,
+                                        "description": "Voornaam."
+                                    },
+                                    "infix": {
+                                        "type": "string",
+                                        "maxLength": 20,
+                                        "description": "Tussenvoegsel, for example \"van der\"."
+                                    },
+                                    "lastName": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80,
+                                        "description": "Achternaam."
                                     }
                                 }
                             }
@@ -924,11 +1258,238 @@
                         }
                     }
                 }
+            },
+            "patch": {
+                "summary": "Change the name (first name, infix, last name) or email address of the logged in user",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "Send only what changes. A new email address also needs the current password, so nobody can take over an account from an unlocked computer.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "minProperties": 1,
+                                "properties": {
+                                    "firstName": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 60,
+                                        "description": "Voornaam."
+                                    },
+                                    "infix": {
+                                        "type": "string",
+                                        "maxLength": 20,
+                                        "description": "Tussenvoegsel, for example \"van der\"."
+                                    },
+                                    "lastName": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80,
+                                        "description": "Achternaam."
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 254
+                                    },
+                                    "currentPassword": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 72
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The updated user.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "The updated user.",
+                                    "type": "object",
+                                    "required": [
+                                        "user"
+                                    ],
+                                    "properties": {
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict with the current state.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete the account of the logged in user",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "Removes the account with its reading profile, reading list and teacher links. Cannot be undone. Needs the current password.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "currentPassword"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "currentPassword": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 72
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Account removed. The token no longer works."
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/me/password": {
+            "put": {
+                "summary": "Change the password of the logged in user",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "currentPassword",
+                                    "newPassword"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "currentPassword": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 72
+                                    },
+                                    "newPassword": {
+                                        "type": "string",
+                                        "minLength": 8,
+                                        "maxLength": 72
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Password changed. The current token stays valid."
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/students": {
             "get": {
-                "summary": "List the students that linked this teacher",
+                "summary": "List the students this teacher follows",
                 "tags": [
                     "Students"
                 ],
@@ -983,13 +1544,310 @@
                 }
             }
         },
+        "/api/students/advice-stats": {
+            "get": {
+                "summary": "Whether the advice of Bo helps, over the students this teacher follows",
+                "tags": [
+                    "Students"
+                ],
+                "description": "How many titles Bo showed, how many ended up on reading lists (from the advice, the catalog or a teacher) and how many were read, split by AI model and rules.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Numbers about the advice.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdviceStats"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/students/search": {
+            "get": {
+                "summary": "Search students to link to the logged in teacher",
+                "tags": [
+                    "Students"
+                ],
+                "description": "Searches name and email address. At most 20 results.",
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 100
+                        },
+                        "in": "query",
+                        "name": "search",
+                        "required": true,
+                        "description": "Part of the name or email address."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching students.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Matching students.",
+                                    "type": "object",
+                                    "required": [
+                                        "students"
+                                    ],
+                                    "properties": {
+                                        "students": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StudentLink"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/students/{studentId}/link": {
+            "put": {
+                "summary": "Follow a student as the logged in teacher",
+                "tags": [
+                    "Students"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "in": "path",
+                        "name": "studentId",
+                        "required": true,
+                        "description": "Student id."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Linked.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Linked.",
+                                    "type": "object",
+                                    "required": [
+                                        "student"
+                                    ],
+                                    "properties": {
+                                        "student": {
+                                            "$ref": "#/components/schemas/StudentLink"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Stop following a student",
+                "tags": [
+                    "Students"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "in": "path",
+                        "name": "studentId",
+                        "required": true,
+                        "description": "Student id."
+                    }
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Unlinked.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Unlinked.",
+                                    "type": "object",
+                                    "required": [
+                                        "student"
+                                    ],
+                                    "properties": {
+                                        "student": {
+                                            "$ref": "#/components/schemas/StudentLink"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/students/{studentId}": {
             "get": {
                 "summary": "See the profile and reading list of one student",
                 "tags": [
                     "Students"
                 ],
-                "description": "Only for students who linked this teacher.",
+                "description": "Only for students this teacher follows.",
                 "parameters": [
                     {
                         "schema": {
@@ -1067,7 +1925,7 @@
                 "tags": [
                     "Students"
                 ],
-                "description": "The same advice the student sees on the advice page. Only for students who linked this teacher.",
+                "description": "The same advice the student sees on the advice page. Only for students this teacher follows.",
                 "parameters": [
                     {
                         "schema": {
@@ -1671,13 +2529,59 @@
                 }
             }
         },
+        "/api/progress/me": {
+            "get": {
+                "summary": "XP and badges of the logged in student",
+                "tags": [
+                    "Progress"
+                ],
+                "description": "Students earn XP for filling in the reading profile, adding titles to the reading list (more from the advice) and reading them. Every title counts once. Badges come at fixed amounts of XP.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "XP, badges and the XP per action.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Progress"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/advice": {
             "get": {
                 "summary": "Get book recommendations for the logged in student",
                 "tags": [
                     "Advice"
                 ],
-                "description": "Based on the saved reading profile and the reading list. The AI model gives the advice when the AI service is available, otherwise the rule based scoring does. Each suggestion explains why it was recommended.",
+                "description": "Based on the saved reading profile and the reading list. The AI model gives the advice when the AI service is available, otherwise the rule based scoring does. Each suggestion explains why it was recommended. Titles on the reading list are never suggested, so the advice changes when the student adds or reads titles.",
                 "security": [
                     {
                         "bearerAuth": []
@@ -1802,6 +2706,15 @@
                                     "bookId": {
                                         "type": "string",
                                         "pattern": "^[a-f0-9]{24}$"
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "enum": [
+                                            "advice",
+                                            "catalog"
+                                        ],
+                                        "default": "catalog",
+                                        "description": "Where the student added the title: the advice page or the catalog."
                                     }
                                 }
                             }
@@ -2059,11 +2972,50 @@
                 }
             }
         },
-        "/api/teachers": {
-            "get": {
-                "summary": "List all teachers and whether they are linked to the student",
+        "/api/reading-list/{id}/rating": {
+            "put": {
+                "summary": "Say what you thought of a title you read",
                 "tags": [
-                    "Teachers"
+                    "Reading list"
+                ],
+                "description": "One to five stars and an optional short comment. Can be changed later. The ratings of students with a similar profile help the advice for others.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "rating"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "rating": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 5
+                                    },
+                                    "comment": {
+                                        "type": "string",
+                                        "maxLength": 280,
+                                        "nullable": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "description": "Reading list entry id."
+                    }
                 ],
                 "security": [
                     {
@@ -2072,11 +3024,96 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "All teachers.",
+                        "description": "Rated.",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "description": "All teachers.",
+                                    "description": "Rated.",
+                                    "type": "object",
+                                    "required": [
+                                        "item"
+                                    ],
+                                    "properties": {
+                                        "item": {
+                                            "$ref": "#/components/schemas/ReadingListItem"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict with the current state.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/teachers": {
+            "get": {
+                "summary": "List the teachers who follow the logged in student",
+                "tags": [
+                    "Teachers"
+                ],
+                "description": "Teachers link themselves to a student, a student cannot change this list.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Linked teachers.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "Linked teachers.",
                                     "type": "object",
                                     "required": [
                                         "teachers"
@@ -2085,7 +3122,7 @@
                                         "teachers": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/TeacherLink"
+                                                "$ref": "#/components/schemas/LinkedTeacher"
                                             }
                                         }
                                     }
@@ -2105,176 +3142,6 @@
                     },
                     "403": {
                         "description": "The role of this user is not allowed to do this.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/teachers/{teacherId}/link": {
-            "put": {
-                "summary": "Let a teacher follow the logged in student",
-                "tags": [
-                    "Teachers"
-                ],
-                "parameters": [
-                    {
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "in": "path",
-                        "name": "teacherId",
-                        "required": true,
-                        "description": "Teacher id."
-                    }
-                ],
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Linked.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "description": "Linked.",
-                                    "type": "object",
-                                    "required": [
-                                        "teacher"
-                                    ],
-                                    "properties": {
-                                        "teacher": {
-                                            "$ref": "#/components/schemas/TeacherLink"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not logged in, or the token is invalid or expired.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "The role of this user is not allowed to do this.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "summary": "Stop a teacher from following the logged in student",
-                "tags": [
-                    "Teachers"
-                ],
-                "parameters": [
-                    {
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "in": "path",
-                        "name": "teacherId",
-                        "required": true,
-                        "description": "Teacher id."
-                    }
-                ],
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Unlinked.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "description": "Unlinked.",
-                                    "type": "object",
-                                    "required": [
-                                        "teacher"
-                                    ],
-                                    "properties": {
-                                        "teacher": {
-                                            "$ref": "#/components/schemas/TeacherLink"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Not logged in, or the token is invalid or expired.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "The role of this user is not allowed to do this.",
-                        "content": {
-                            "application/problem+json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ProblemDetails"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found.",
                         "content": {
                             "application/problem+json": {
                                 "schema": {
@@ -2315,8 +3182,12 @@
             "description": "The personal reading list of a student."
         },
         {
+            "name": "Progress",
+            "description": "XP and badges of a student."
+        },
+        {
             "name": "Teachers",
-            "description": "A student chooses which teachers may follow them."
+            "description": "The teachers who follow a student."
         },
         {
             "name": "Students",

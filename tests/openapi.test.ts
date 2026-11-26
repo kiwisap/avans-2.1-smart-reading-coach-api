@@ -6,6 +6,10 @@ import addFormatsModule from 'ajv-formats';
 import type { AdviceDto } from '../src/dto/adviceDto.js';
 import type { BookDto } from '../src/dto/bookDto.js';
 import type { ReadingListItemDto } from '../src/dto/readingListItemDto.js';
+import type { AdviceStatsDto } from '../src/dto/adviceStatsDto.js';
+import type { LinkedTeacherDto } from '../src/dto/linkedTeacherDto.js';
+import { toProgress } from '../src/services/progressService.js';
+import type { StudentLinkDto } from '../src/dto/studentLinkDto.js';
 import type { StudentOverviewDto } from '../src/dto/studentOverviewDto.js';
 import type { SuggestionDto } from '../src/dto/suggestionDto.js';
 import type { UserDto } from '../src/dto/userDto.js';
@@ -123,7 +127,10 @@ describe('DTOs follow the schemas', () => {
     const user: UserDto = {
         id: crypto.randomUUID(),
         email: 'a@b.nl',
-        name: 'Sam',
+        name: 'Sam van der Berg',
+        firstName: 'Sam',
+        infix: 'van der',
+        lastName: 'Berg',
         role: 'student',
     };
 
@@ -148,6 +155,9 @@ describe('DTOs follow the schemas', () => {
             status: 'unread',
             addedAt: new Date(),
             readAt: null,
+            source: null,
+            rating: null,
+            comment: null,
             book,
         };
         assertValid('ReadingListItem', item);
@@ -159,6 +169,7 @@ describe('DTOs follow the schemas', () => {
             student: { id: user.id, name: user.name, email: user.email },
             profile: null,
             readingList: [],
+            progress: toProgress([]),
         };
         assertValid('StudentOverview', overview);
         assertValid('StudentOverview', {
@@ -172,6 +183,36 @@ describe('DTOs follow the schemas', () => {
                 updatedAt: new Date(),
             },
         });
+    });
+
+    it('accepts the links between teachers and students', () => {
+        const teacher: LinkedTeacherDto = {
+            id: crypto.randomUUID(),
+            name: 'Demo Teacher',
+            email: 'teacher@example.com',
+        };
+        assertValid('LinkedTeacher', teacher);
+        const student: StudentLinkDto = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            linked: false,
+        };
+        assertValid('StudentLink', student);
+    });
+
+    it('accepts progress and advice statistics', () => {
+        assertValid('Progress', toProgress([{ xp: 200, createdAt: new Date() }]));
+        const count = { total: 2, read: 1, rated: 1, averageRating: 4 };
+        const model = { shown: 5, added: 2, read: 1, rated: 1, averageRating: null };
+        const stats: AdviceStatsDto = {
+            students: 3,
+            shown: 10,
+            added: { advice: count, catalog: count, teacher: count, unknown: count },
+            catalogAlsoSuggested: 1,
+            bySource: { ai: model, rules: model },
+        };
+        assertValid('AdviceStats', stats);
     });
 
     it('rejects data that does not match', () => {
@@ -247,6 +288,9 @@ describe('response serialization', () => {
         status: 'read',
         addedAt: new Date('2026-09-01T10:00:00.000Z'),
         readAt: new Date('2026-09-02T10:00:00.000Z'),
+        source: 'advice',
+        rating: 4,
+        comment: 'Mooi verhaal',
         book,
     };
 
@@ -281,6 +325,7 @@ describe('response serialization', () => {
             student: { id: item.id, name: 'Sam', email: 'sam@example.org' },
             profile: null,
             readingList: [item],
+            progress: toProgress([{ xp: 60, createdAt: new Date('2026-09-02T10:00:00.000Z') }]),
         };
         const expected = JSON.parse(JSON.stringify(overview));
         assert.deepEqual(await serialize('StudentOverview', overview), expected);

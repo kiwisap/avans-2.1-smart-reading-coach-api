@@ -8,6 +8,9 @@ import {
     READING_GOALS,
 } from '../profile/profileOptions.js';
 import { ADVICE_SOURCES } from '../advice/sources.js';
+import { BADGE_IDS } from '../progress/xp.js';
+import { MAX_COMMENT_LENGTH, MAX_RATING, MIN_RATING } from '../readingList/ratings.js';
+import { READING_LIST_SOURCES } from '../readingList/sources.js';
 import { READING_STATUSES } from '../readingList/statuses.js';
 
 // Shared JSON schemas. Each one has an $id, so routes can point to it with { $ref: 'Name#' }.
@@ -97,6 +100,13 @@ export const sharedSchemas = [
         description: 'Whether the student has read the title.',
     },
     {
+        $id: 'ReadingListSource',
+        type: 'string',
+        enum: [...READING_LIST_SOURCES],
+        description:
+            'Where a title on the reading list came from: the advice page, the catalog or a teacher.',
+    },
+    {
         $id: 'ProblemDetails',
         type: 'object',
         description: 'Error response according to RFC 9457 (application/problem+json).',
@@ -114,11 +124,14 @@ export const sharedSchemas = [
     {
         $id: 'User',
         type: 'object',
-        required: ['id', 'email', 'name', 'role'],
+        required: ['id', 'email', 'name', 'firstName', 'infix', 'lastName', 'role'],
         properties: {
             id: uuid('User id.'),
             email: text('Email address.', { format: 'email' }),
-            name: text('Display name.'),
+            name: text('Display name: first name, infix and last name together.'),
+            firstName: text('Voornaam.'),
+            infix: nullableText('Tussenvoegsel, for example "van der". Null when there is none.'),
+            lastName: text('Achternaam.'),
             role: { $ref: 'Role#' },
         },
     },
@@ -233,24 +246,62 @@ export const sharedSchemas = [
     {
         $id: 'ReadingListItem',
         type: 'object',
-        required: ['id', 'bookId', 'status', 'addedAt', 'readAt', 'book'],
+        required: [
+            'id',
+            'bookId',
+            'status',
+            'addedAt',
+            'readAt',
+            'source',
+            'rating',
+            'comment',
+            'book',
+        ],
         properties: {
             id: uuid('Id of the reading list entry.'),
             bookId: text('Catalog id of the book.'),
             status: { $ref: 'ReadingStatus#' },
             addedAt: { type: 'string', format: 'date-time' },
             readAt: { type: 'string', format: 'date-time', nullable: true },
+            source: nullableRef(
+                'ReadingListSource',
+                'Null for titles added before this was tracked.',
+            ),
+            rating: {
+                type: 'integer',
+                minimum: MIN_RATING,
+                maximum: MAX_RATING,
+                nullable: true,
+                description: 'Stars the student gave after reading, null when not rated.',
+            },
+            comment: {
+                type: 'string',
+                maxLength: MAX_COMMENT_LENGTH,
+                nullable: true,
+                description: 'What the student thought of it, in their own words.',
+            },
             book: nullableRef('Book', 'The book, or null when it was removed from the catalog.'),
         },
     },
     {
-        $id: 'TeacherLink',
+        $id: 'LinkedTeacher',
         type: 'object',
-        required: ['id', 'name', 'linked'],
+        required: ['id', 'name', 'email'],
         properties: {
             id: uuid('Teacher id.'),
             name: text('Teacher name.'),
-            linked: { type: 'boolean', description: 'Whether this teacher can see the student.' },
+            email: text('Teacher email address.', { format: 'email' }),
+        },
+    },
+    {
+        $id: 'StudentLink',
+        type: 'object',
+        required: ['id', 'name', 'email', 'linked'],
+        properties: {
+            id: uuid('Student id.'),
+            name: text('Student name.'),
+            email: text('Student email address.', { format: 'email' }),
+            linked: { type: 'boolean', description: 'Whether this teacher follows the student.' },
         },
     },
     {
@@ -267,7 +318,7 @@ export const sharedSchemas = [
     {
         $id: 'StudentOverview',
         type: 'object',
-        required: ['student', 'profile', 'readingList'],
+        required: ['student', 'profile', 'readingList', 'progress'],
         properties: {
             student: {
                 type: 'object',
@@ -280,6 +331,109 @@ export const sharedSchemas = [
             },
             profile: nullableRef('ReadingProfile'),
             readingList: { type: 'array', items: { $ref: 'ReadingListItem#' } },
+            progress: { $ref: 'Progress#' },
+        },
+    },
+    {
+        $id: 'Badge',
+        type: 'object',
+        required: ['id', 'xp', 'earnedAt'],
+        properties: {
+            id: { type: 'string', enum: [...BADGE_IDS], description: 'Badge id.' },
+            xp: { type: 'integer', description: 'XP needed for the badge.' },
+            earnedAt: {
+                type: 'string',
+                format: 'date-time',
+                nullable: true,
+                description: 'When the badge was earned, null while it is not earned yet.',
+            },
+        },
+    },
+    {
+        $id: 'Progress',
+        type: 'object',
+        description: 'XP and badges of a student.',
+        required: ['xp', 'badges', 'nextBadge', 'rewards'],
+        properties: {
+            xp: { type: 'integer', description: 'Total XP.' },
+            badges: { type: 'array', items: { $ref: 'Badge#' }, description: 'Low to high.' },
+            nextBadge: {
+                type: 'object',
+                nullable: true,
+                required: ['id', 'xp'],
+                description: 'The next badge to earn, null when every badge is earned.',
+                properties: {
+                    id: { type: 'string', enum: [...BADGE_IDS] },
+                    xp: { type: 'integer' },
+                },
+            },
+            rewards: {
+                type: 'object',
+                description: 'XP per action.',
+                required: ['profile', 'added', 'addedFromAdvice', 'read', 'rated'],
+                properties: {
+                    profile: { type: 'integer' },
+                    added: { type: 'integer' },
+                    addedFromAdvice: { type: 'integer' },
+                    read: { type: 'integer' },
+                    rated: { type: 'integer' },
+                },
+            },
+        },
+    },
+    {
+        $id: 'SourceCount',
+        type: 'object',
+        required: ['total', 'read', 'rated', 'averageRating'],
+        properties: {
+            total: { type: 'integer', description: 'Titles on the reading lists.' },
+            read: { type: 'integer', description: 'Of which read.' },
+            rated: { type: 'integer', description: 'Ratings given.' },
+            averageRating: { type: 'number', nullable: true, description: 'Average stars.' },
+        },
+    },
+    {
+        $id: 'AdviceSourceStats',
+        type: 'object',
+        required: ['shown', 'added', 'read', 'rated', 'averageRating'],
+        properties: {
+            shown: { type: 'integer', description: 'Titles Bo showed.' },
+            added: { type: 'integer', description: 'Of which added from the advice page.' },
+            read: { type: 'integer', description: 'Of which read.' },
+            rated: { type: 'integer', description: 'Ratings given.' },
+            averageRating: { type: 'number', nullable: true, description: 'Average stars.' },
+        },
+    },
+    {
+        $id: 'AdviceStats',
+        type: 'object',
+        description: 'Whether the advice helps, over the students a teacher follows.',
+        required: ['students', 'shown', 'added', 'catalogAlsoSuggested', 'bySource'],
+        properties: {
+            students: { type: 'integer' },
+            shown: { type: 'integer', description: 'Different titles Bo showed.' },
+            added: {
+                type: 'object',
+                required: ['advice', 'catalog', 'teacher', 'unknown'],
+                properties: {
+                    advice: { $ref: 'SourceCount#' },
+                    catalog: { $ref: 'SourceCount#' },
+                    teacher: { $ref: 'SourceCount#' },
+                    unknown: { $ref: 'SourceCount#' },
+                },
+            },
+            catalogAlsoSuggested: {
+                type: 'integer',
+                description: 'Added from the catalog, while Bo had shown the title as well.',
+            },
+            bySource: {
+                type: 'object',
+                required: ['ai', 'rules'],
+                properties: {
+                    ai: { $ref: 'AdviceSourceStats#' },
+                    rules: { $ref: 'AdviceSourceStats#' },
+                },
+            },
         },
     },
     {

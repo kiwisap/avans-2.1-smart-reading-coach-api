@@ -19,8 +19,15 @@ export interface ProblemDetails {
 
 const KNOWN_FIELDS = new Set([
     'email',
+    'search',
+    'rating',
+    'comment',
     'password',
-    'name',
+    'currentPassword',
+    'newPassword',
+    'firstName',
+    'infix',
+    'lastName',
     'languageLevel',
     'materialTypes',
     'topics',
@@ -52,7 +59,7 @@ export function describeIssue(issue: ValidationIssue): { code: ErrorCode; params
                 ? { code: 'validation.invalidEmail' }
                 : { code: 'validation.invalidFormat', params: { field } };
         case 'minLength':
-            return key === 'password'
+            return key === 'password' || key === 'newPassword'
                 ? {
                       code: 'validation.passwordTooShort',
                       params: { min: Number(issue.params.limit) },

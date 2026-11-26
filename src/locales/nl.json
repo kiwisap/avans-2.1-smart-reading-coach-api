@@ -21,6 +21,11 @@
             "emailTaken": "Er bestaat al een account met dit e-mailadres",
             "invalidCredentials": "Onjuist e-mailadres of wachtwoord"
         },
+        "account": {
+            "passwordRequired": "Vul je huidige wachtwoord in om dit te wijzigen",
+            "wrongPassword": "Je huidige wachtwoord klopt niet",
+            "samePassword": "Je nieuwe wachtwoord moet anders zijn dan je huidige wachtwoord"
+        },
         "books": {
             "notFound": "Titel niet gevonden"
         },
@@ -34,20 +39,25 @@
         "readingList": {
             "bookNotInCatalog": "Deze titel staat niet in de catalogus",
             "alreadyOnList": "Deze titel staat al op je leeslijst",
-            "itemNotFound": "Leeslijstitem niet gevonden"
-        },
-        "teachers": {
-            "notFound": "Docent niet gevonden"
+            "itemNotFound": "Leeslijstitem niet gevonden",
+            "rateAfterReading": "Je kunt een titel pas beoordelen als je hem gelezen hebt"
         },
         "students": {
-            "notLinked": "Deze leerling is niet aan jou gekoppeld",
+            "notLinked": "Je bent niet aan deze leerling gekoppeld",
             "notFound": "Leerling niet gevonden"
         }
     },
     "fields": {
         "email": "e-mailadres",
         "password": "wachtwoord",
-        "name": "naam",
+        "currentPassword": "huidige wachtwoord",
+        "newPassword": "nieuwe wachtwoord",
+        "firstName": "voornaam",
+        "infix": "tussenvoegsel",
+        "lastName": "achternaam",
+        "search": "zoekterm",
+        "rating": "beoordeling",
+        "comment": "opmerking",
         "languageLevel": "leesniveau",
         "materialTypes": "soorten teksten",
         "topics": "onderwerpen",
@@ -83,7 +93,24 @@
             "levelEasier": "Het is iets makkelijker dan jouw niveau ({{level}}), dus het leest lekker weg.",
             "materialType": "Het is een {{type}}, een van de soorten teksten die je leuk vindt.",
             "length": "De lengte past bij je wens voor een {{length}} tekst.",
+            "peers": "Leerlingen met een profiel zoals jij gaven dit gemiddeld {{stars}} van de 5 sterren.",
             "fallback": "Een goede keuze op jouw leesniveau."
+        },
+        "story": {
+            "openTopics": "Omdat je van {{topics}} houdt, denk ik dat dit echt iets voor jou is.",
+            "openTopicsAlt": "Het gaat over {{topics}}, en daar lees jij graag over.",
+            "openFallback": "Ik denk dat dit goed bij je past.",
+            "goals": {
+                "enjoyment": "Je leest graag voor je plezier, en daar is dit een fijne keuze voor.",
+                "learn": "Je wilt graag iets nieuws leren, en daar helpt dit je mee.",
+                "language": "Je wilt je taal oefenen, en daar is dit een goede tekst voor.",
+                "work": "Dit is handig voor je werk of studie."
+            },
+            "levelExact": "Het is een {{type}} op {{level}}, precies jouw niveau",
+            "levelEasier": "Het is een {{type}} op {{bookLevel}}, iets makkelijker dan {{level}}, dus het leest lekker vlot",
+            "levelUnknown": "Het is een {{type}}",
+            "lengthFits": ", en de lengte past bij je wens voor een {{length}} tekst.",
+            "closeType": "Bovendien is het precies het soort tekst dat je graag leest."
         },
         "description": {
             "kindFallback": "tekst",

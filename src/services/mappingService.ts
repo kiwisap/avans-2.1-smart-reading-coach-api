@@ -1,3 +1,4 @@
+import type { BookRating } from '../entities/bookRating.js';
 import type { WithId } from 'mongodb';
 import type { BookDto } from '../dto/bookDto.js';
 import type { ProfileDto } from '../dto/profileDto.js';
@@ -13,7 +14,15 @@ import type { User } from '../entities/user.js';
 // or the Mongo _id never leak into a response by accident.
 
 export function toUserDto(user: User): UserDto {
-    return { id: user.id, email: user.email, name: user.name, role: user.role };
+    return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        firstName: user.firstName,
+        infix: user.infix,
+        lastName: user.lastName,
+        role: user.role,
+    };
 }
 
 export function toProfileDto(profile: ReadingProfile | null): ProfileDto | null {
@@ -29,13 +38,21 @@ export function toProfileDto(profile: ReadingProfile | null): ProfileDto | null 
 }
 
 export function toBookDto(doc: WithId<Book>): BookDto {
-    const { _id, key: _key, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = doc;
+    const {
+        _id,
+        key: _key,
+        sources: _sources,
+        createdAt: _createdAt,
+        updatedAt: _updatedAt,
+        ...rest
+    } = doc;
     return { id: _id.toString(), ...rest };
 }
 
 export function toReadingListItemDto(
     item: ReadingListItem,
     book: BookDto | null | undefined,
+    rating?: Pick<BookRating, 'rating' | 'comment'> | null,
 ): ReadingListItemDto {
     return {
         id: item.id,
@@ -43,6 +60,9 @@ export function toReadingListItemDto(
         status: item.status,
         addedAt: item.addedAt,
         readAt: item.readAt,
+        source: item.source,
+        rating: rating?.rating ?? null,
+        comment: rating?.comment ?? null,
         book: book ?? null,
     };
 }

@@ -72,7 +72,7 @@ export function t(
 // For values that come from data (a book type from the database): the text when there is one,
 // otherwise the fallback, so unknown values never break a response.
 export function tOr(
-    group: 'advice.types' | 'advice.lengths' | 'advice.goals',
+    group: 'advice.types' | 'advice.lengths' | 'advice.goals' | 'advice.story.goals',
     value: string,
     fallback: string,
     locale: Locale = DEFAULT_LOCALE,

@@ -1,5 +1,7 @@
 export interface RegisterDto {
     email: string;
     password: string;
-    name: string;
+    firstName: string;
+    infix?: string;
+    lastName: string;
 }

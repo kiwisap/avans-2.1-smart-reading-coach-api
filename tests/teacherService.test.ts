@@ -3,11 +3,15 @@ import { describe, it } from 'node:test';
 import type { ReadingProfile } from '../src/entities/readingProfile.js';
 import type { User } from '../src/entities/user.js';
 import { createTeacherLinkService } from '../src/services/teacherLinkService.js';
+import { toProgress } from '../src/services/progressService.js';
 import { createTeacherService } from '../src/services/teacherService.js';
 
 const makeUser = (id: string, name: string, role: User['role']): User => ({
     id,
     name,
+    firstName: name,
+    infix: null,
+    lastName: '',
     role,
     email: `${id}@example.com`,
     passwordHash: 'hash',
@@ -33,7 +37,8 @@ const profile: ReadingProfile = {
 
 function setup(links: [string, string][] = [['t1', 's1']]) {
     const linkSet = new Set(links.map(([teacher, student]) => `${teacher}:${student}`));
-    const added: { studentId: string; bookId: string }[] = [];
+    const added: { studentId: string; bookId: string; source: string }[] = [];
+    const searches: { query: string; limit: number }[] = [];
 
     const userRepository = {
         findById: async (id: string) => users[id] ?? null,
@@ -48,7 +53,21 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
         unlinkStudentFromTeacher: async (teacherId: string, studentId: string) => {
             linkSet.delete(`${teacherId}:${studentId}`);
         },
-        findTeachersForStudent: async () => [],
+        findTeachersOfStudent: async (studentId: string) =>
+            Object.values(users)
+                .filter((user) => user.role === 'teacher' && linkSet.has(`${user.id}:${studentId}`))
+                .map((user) => ({ id: user.id, name: user.name, email: user.email })),
+        searchStudents: async (teacherId: string, query: string, limit: number) => {
+            searches.push({ query, limit });
+            return Object.values(users)
+                .filter((user) => user.role === 'student' && user.name.includes(query))
+                .map((user) => ({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    linked: linkSet.has(`${teacherId}:${user.id}`),
+                }));
+        },
     };
     const profileRepository = { findByUserId: async () => profile };
     const readingListService = {
@@ -59,17 +78,23 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
                 status: 'unread' as const,
                 addedAt: new Date(),
                 readAt: null,
+                source: null,
+                rating: null,
+                comment: null,
                 book: null,
             },
         ],
-        add: async (studentId: string, bookId: string) => {
-            added.push({ studentId, bookId });
+        add: async (studentId: string, bookId: string, source: string) => {
+            added.push({ studentId, bookId, source });
             return {
                 id: 'i2',
                 bookId,
                 status: 'unread' as const,
                 addedAt: new Date(),
                 readAt: null,
+                source: null,
+                rating: null,
+                comment: null,
                 book: null,
             };
         },
@@ -77,8 +102,10 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
 
     const adviceRequests: string[] = [];
     const adviceService = {
-        getAdvice: async (studentId: string) => {
-            adviceRequests.push(studentId);
+        getAdvice: async (studentId: string, _locale?: unknown, options?: { record?: boolean }) => {
+            adviceRequests.push(
+                `${studentId}:${options?.record === false ? 'norecord' : 'record'}`,
+            );
             return { source: 'rules' as const, suggestions: [] };
         },
     };
@@ -89,11 +116,13 @@ function setup(links: [string, string][] = [['t1', 's1']]) {
             profileRepository,
             readingListService,
             adviceService,
+            progressService: { getProgress: async () => toProgress([]) },
         }),
         adviceRequests,
         linkService: createTeacherLinkService({ userRepository }),
         added,
         linkSet,
+        searches,
     };
 }
 
@@ -106,6 +135,7 @@ describe('teacherService', () => {
         assert.equal(overview.student.name, 'Student');
         assert.equal(overview.profile?.languageLevel, '2F');
         assert.equal(overview.readingList.length, 1);
+        assert.equal(overview.progress.xp, 0);
     });
 
     it('refuses access to a student who is not linked to this teacher', async () => {
@@ -120,7 +150,8 @@ describe('teacherService', () => {
         const { teacherService, adviceRequests } = setup();
         const advice = await teacherService.getStudentAdvice('t1', 's1');
         assert.equal(advice.source, 'rules');
-        assert.deepEqual(adviceRequests, ['s1']);
+        // A teacher looking does not count as Bo showing the titles to the student.
+        assert.deepEqual(adviceRequests, ['s1:norecord']);
     });
 
     it('does not show the advice of a student who is not linked', async () => {
@@ -135,7 +166,7 @@ describe('teacherService', () => {
     it("lets a teacher add a title to a linked student's list", async () => {
         const { teacherService, added } = setup();
         await teacherService.addToStudentReadingList('t1', 's1', 'b1');
-        assert.deepEqual(added, [{ studentId: 's1', bookId: 'b1' }]);
+        assert.deepEqual(added, [{ studentId: 's1', bookId: 'b1', source: 'teacher' }]);
     });
 
     it('does not add titles for a student who is not linked', async () => {
@@ -149,24 +180,51 @@ describe('teacherService', () => {
 });
 
 describe('teacherLinkService', () => {
-    it('links and unlinks a student to a teacher', async () => {
+    it('lets a teacher link and unlink themselves to a student', async () => {
         const { linkService, linkSet } = setup([]);
-        await linkService.link('s1', 't1');
+        const linked = await linkService.link('t1', 's1');
+        assert.equal(linked.linked, true);
         assert.ok(linkSet.has('t1:s1'));
-        await linkService.unlink('s1', 't1');
+        const unlinked = await linkService.unlink('t1', 's1');
+        assert.equal(unlinked.linked, false);
         assert.ok(!linkSet.has('t1:s1'));
     });
 
-    it('rejects linking to someone who is not a teacher', async () => {
-        const { linkService } = setup();
-        await assert.rejects(linkService.link('s1', 's1'), (err: unknown) => statusOf(err) === 404);
+    it('rejects linking to someone who is not a student', async () => {
+        const { linkService } = setup([]);
+        await assert.rejects(linkService.link('t1', 't2'), (err: unknown) => statusOf(err) === 404);
     });
 
-    it('rejects linking to an unknown teacher', async () => {
-        const { linkService } = setup();
+    it('rejects linking to an unknown student', async () => {
+        const { linkService } = setup([]);
         await assert.rejects(
-            linkService.link('s1', 'nobody'),
+            linkService.link('t1', 'nobody'),
             (err: unknown) => statusOf(err) === 404,
         );
+    });
+
+    it('shows a student only the teachers who follow them', async () => {
+        const { linkService } = setup([['t1', 's1']]);
+        const teachers = await linkService.listTeachersOfStudent('s1');
+        assert.deepEqual(
+            teachers.map((teacher) => teacher.id),
+            ['t1'],
+        );
+    });
+
+    it('searches students with a trimmed query and a limit, and says who is linked', async () => {
+        const { linkService, searches } = setup([['t1', 's1']]);
+        const results = await linkService.searchStudents('t1', '  Stud  ');
+        assert.deepEqual(searches, [{ query: 'Stud', limit: 20 }]);
+        assert.deepEqual(
+            results.map((student) => [student.id, student.linked]),
+            [['s1', true]],
+        );
+    });
+
+    it('does not search with fewer than two characters', async () => {
+        const { linkService, searches } = setup();
+        assert.deepEqual(await linkService.searchStudents('t1', ' S '), []);
+        assert.equal(searches.length, 0);
     });
 });

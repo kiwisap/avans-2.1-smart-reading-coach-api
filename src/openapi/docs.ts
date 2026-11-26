@@ -12,7 +12,8 @@ export const TAGS = [
     { name: 'Profile', description: 'The reading profile of a student.' },
     { name: 'Advice', description: 'Book recommendations based on the profile.' },
     { name: 'Reading list', description: 'The personal reading list of a student.' },
-    { name: 'Teachers', description: 'A student chooses which teachers may follow them.' },
+    { name: 'Progress', description: 'XP and badges of a student.' },
+    { name: 'Teachers', description: 'The teachers who follow a student.' },
     { name: 'Students', description: 'What a teacher sees about linked students.' },
     { name: 'System', description: 'Health check.' },
 ];

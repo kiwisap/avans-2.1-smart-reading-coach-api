@@ -17,7 +17,13 @@ function isUniqueViolation(err: unknown): boolean {
 export function createAuthService({ userRepository }: { userRepository: UserRepository }) {
     return {
         // Self registration always creates a student. Teachers are created by an admin or the seed script.
-        async register({ email, password, name }: RegisterDto): Promise<UserDto> {
+        async register({
+            email,
+            password,
+            firstName,
+            infix,
+            lastName,
+        }: RegisterDto): Promise<UserDto> {
             const normalizedEmail = email.trim().toLowerCase();
 
             if (await userRepository.findByEmail(normalizedEmail)) {
@@ -29,7 +35,9 @@ export function createAuthService({ userRepository }: { userRepository: UserRepo
                 const user = await userRepository.create({
                     email: normalizedEmail,
                     passwordHash,
-                    name: name.trim(),
+                    firstName,
+                    infix,
+                    lastName,
                     role: 'student',
                 });
                 return toUserDto(user);

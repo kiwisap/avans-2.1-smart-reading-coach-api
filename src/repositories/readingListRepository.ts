@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { readingListItems } from '../db/schema.js';
 import type { ReadingListItem } from '../entities/readingListItem.js';
 import type { Database } from '../db/types.js';
+import type { ReadingListSource } from '../readingList/sources.js';
 import type { ReadingStatus } from '../readingList/statuses.js';
 
 // Every query filters on userId, so a student can never touch someone else's list.
@@ -12,12 +13,25 @@ export function createReadingListRepository(db: Database) {
         },
 
         // Returns null when the book is already on the list.
-        async create(userId: string, bookId: string): Promise<ReadingListItem | null> {
+        async create(
+            userId: string,
+            bookId: string,
+            source: ReadingListSource,
+        ): Promise<ReadingListItem | null> {
             const [item] = await db
                 .insert(readingListItems)
-                .values({ userId, bookId })
+                .values({ userId, bookId, source })
                 .onConflictDoNothing()
                 .returning();
+            return item ?? null;
+        },
+
+        async findById(userId: string, id: string): Promise<ReadingListItem | null> {
+            const [item] = await db
+                .select()
+                .from(readingListItems)
+                .where(and(eq(readingListItems.id, id), eq(readingListItems.userId, userId)))
+                .limit(1);
             return item ?? null;
         },
 

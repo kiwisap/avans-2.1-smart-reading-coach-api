@@ -10,11 +10,12 @@ import type { ReadingStatus } from '../readingList/statuses.js';
 export interface AiHistoryItem {
     key: string;
     status: ReadingStatus;
+    rating?: number; // 1 to 5 stars the student gave, the model weighs it in
 }
 
 // One recommendation as the AI service returns it.
 export interface AiRecommendation {
-    cataloguscode: string;
+    catalogCode: string;
     key: string;
     title: string;
     author: string | null;
@@ -22,8 +23,8 @@ export interface AiRecommendation {
     genre: string;
     level: string;
     score: number;
-    reasons: string[];
-    summary: string;
+    reasons: string[]; // the separate reasons, shown to the teacher
+    motivation: string; // Bo's short story about why it fits, shown to the student
 }
 
 interface AiRecommendationResponse {
@@ -38,6 +39,8 @@ export interface AiClient {
         count: number,
     ): Promise<AiRecommendation[] | null>;
     isHealthy(): Promise<boolean>;
+    // Asks the service to train a new model on the current catalog. True when training started.
+    retrain(): Promise<boolean>;
 }
 
 export interface AiClientOptions {
@@ -60,6 +63,7 @@ function isRecommendationResponse(value: unknown): value is AiRecommendationResp
                 typeof item === 'object' &&
                 item !== null &&
                 typeof (item as AiRecommendation).key === 'string' &&
+                typeof (item as AiRecommendation).motivation === 'string' &&
                 Array.isArray((item as AiRecommendation).reasons),
         )
     );
@@ -108,6 +112,25 @@ export function createAiClient({
             } catch (err) {
                 log?.warn({ err }, 'AI service is not reachable');
                 return null;
+            }
+        },
+
+        async retrain() {
+            try {
+                const response = await fetchImpl(`${root}/api/admin/retrain`, {
+                    method: 'POST',
+                    headers,
+                    body: '{}',
+                    signal: AbortSignal.timeout(timeoutMs),
+                });
+                if (!response.ok) {
+                    log?.warn({ status: response.status }, 'AI service did not start training');
+                    return false;
+                }
+                return true;
+            } catch (err) {
+                log?.warn({ err }, 'AI service is not reachable');
+                return false;
             }
         },
 

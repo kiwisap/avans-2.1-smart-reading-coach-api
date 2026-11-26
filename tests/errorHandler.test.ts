@@ -58,18 +58,18 @@ describe('describeIssue', () => {
             instancePath: string,
             params: Record<string, unknown> = {},
         ) => describeIssue({ keyword, instancePath, params });
-        assert.deepEqual(issue('required', '', { missingProperty: 'name' }), {
+        assert.deepEqual(issue('required', '', { missingProperty: 'firstName' }), {
             code: 'validation.required',
-            params: { field: 'name' },
+            params: { field: 'firstName' },
         });
         assert.deepEqual(issue('format', '/email'), { code: 'validation.invalidEmail' });
         assert.deepEqual(issue('minLength', '/password', { limit: 8 }), {
             code: 'validation.passwordTooShort',
             params: { min: 8 },
         });
-        assert.deepEqual(issue('maxLength', '/name'), {
+        assert.deepEqual(issue('maxLength', '/lastName'), {
             code: 'validation.tooLong',
-            params: { field: 'name' },
+            params: { field: 'lastName' },
         });
         assert.deepEqual(issue('type', '/unknown'), {
             code: 'validation.invalid',

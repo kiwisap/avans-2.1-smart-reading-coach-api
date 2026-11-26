@@ -9,15 +9,18 @@ import {
     type ProfileData,
 } from '../profile/profileOptions.js';
 import type { BookRepository } from '../repositories/bookRepository.js';
+import { XP_REWARDS } from '../progress/xp.js';
 import type { ProfileRepository } from '../repositories/profileRepository.js';
+import type { XpRepository } from '../repositories/xpRepository.js';
 import { toProfileDto } from './mappingService.js';
 
 interface Deps {
     profileRepository: Pick<ProfileRepository, 'findByUserId' | 'upsert'>;
     bookRepository: Pick<BookRepository, 'facets'>;
+    xpRepository: Pick<XpRepository, 'award'>;
 }
 
-export function createProfileService({ profileRepository, bookRepository }: Deps) {
+export function createProfileService({ profileRepository, bookRepository, xpRepository }: Deps) {
     return {
         async getProfile(userId: string): Promise<ProfileDto | null> {
             return toProfileDto(await profileRepository.findByUserId(userId));
@@ -45,6 +48,7 @@ export function createProfileService({ profileRepository, bookRepository }: Deps
                 desiredLength: input.desiredLength,
                 readingGoal: input.readingGoal,
             });
+            await xpRepository.award(userId, 'profile', '', XP_REWARDS.profile);
             return toProfileDto(saved);
         },
 

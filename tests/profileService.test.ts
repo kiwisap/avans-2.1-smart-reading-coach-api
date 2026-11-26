@@ -24,7 +24,18 @@ function setup(themes: string[] = ['liefde', 'oorlog', 'humor']) {
         },
     };
     const bookRepository = { facets: async () => ({ types: [], levels: [], themes }) };
-    return { service: createProfileService({ profileRepository, bookRepository }), calls };
+    const awards: string[] = [];
+    const xpRepository = {
+        award: async (userId: string, reason: string, _bookId: string, xp: number) => {
+            awards.push(`${userId}:${reason}:${xp}`);
+            return true;
+        },
+    };
+    return {
+        service: createProfileService({ profileRepository, bookRepository, xpRepository }),
+        calls,
+        awards,
+    };
 }
 
 const valid: ProfileData = {
@@ -82,5 +93,11 @@ describe('profileService', () => {
                 (err as HttpError).code === 'profile.tooManyTopics' &&
                 (err as HttpError).params?.max === 5,
         );
+    });
+
+    it('gives XP for the reading profile', async () => {
+        const { service, awards } = setup();
+        await service.saveProfile('u1', valid);
+        assert.deepEqual(awards, ['u1:profile:50']);
     });
 });
