@@ -34,3 +34,10 @@ services:
           # A sleeping AI service needs time to wake up; until then the rules give the advice.
           - key: AI_TIMEOUT_MS
             value: '5000'
+          # Mail over SMTP, for example Brevo: smtps://<login>:<smtp key>@smtp-relay.brevo.com:465
+          - key: SMTP_URL
+            sync: false
+          - key: MAIL_FROM # a sender address verified at the mail provider
+            sync: false
+          - key: APP_URL # address of the website, the links in the mails point there
+            sync: false

@@ -9,4 +9,5 @@ export interface UserDto {
     infix: string | null; // tussenvoegsel
     lastName: string;
     role: UserRole;
+    pendingEmail: string | null; // a new address that still waits for the link to be clicked
 }

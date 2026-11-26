@@ -120,7 +120,8 @@
                     "firstName",
                     "infix",
                     "lastName",
-                    "role"
+                    "role",
+                    "pendingEmail"
                 ],
                 "properties": {
                     "id": {
@@ -152,6 +153,12 @@
                     },
                     "role": {
                         "$ref": "#/components/schemas/Role"
+                    },
+                    "pendingEmail": {
+                        "type": "string",
+                        "format": "email",
+                        "nullable": true,
+                        "description": "A new email address that waits for its confirmation link to be clicked."
                     }
                 }
             },
@@ -168,6 +175,20 @@
                     },
                     "user": {
                         "$ref": "#/components/schemas/User"
+                    }
+                }
+            },
+            "Registered": {
+                "type": "object",
+                "description": "The account exists, but can only be used after confirming the email address.",
+                "required": [
+                    "email"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "description": "The address the confirmation link was sent to.",
+                        "format": "email"
                     }
                 }
             },
@@ -1068,7 +1089,7 @@
                 "tags": [
                     "Auth"
                 ],
-                "description": "New accounts are students. The response contains a token, so the user is logged in.",
+                "description": "New accounts are students. A confirmation link is mailed to the address; logging in works after clicking it.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1117,11 +1138,278 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Account created.",
+                        "description": "Account created, waiting for confirmation.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Registered"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict with the current state.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/verify-email": {
+            "post": {
+                "summary": "Confirm the email address with the link from the mail",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "Logs the user in: the response contains a token.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "token": {
+                                        "type": "string",
+                                        "minLength": 20,
+                                        "maxLength": 200,
+                                        "pattern": "^[A-Za-z0-9_-]+$"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Confirmed and logged in.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/AuthResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/verify-email/resend": {
+            "post": {
+                "summary": "Send the confirmation mail again",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "At most once a minute per account.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "email"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 254
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Accepted. The same answer whether the address has an account or not, so addresses cannot be probed."
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/password/forgot": {
+            "post": {
+                "summary": "Mail a link to choose a new password",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "The link works for one hour, once. At most once a minute per account.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "email"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 254
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Accepted. The same answer whether the address has an account or not, so addresses cannot be probed."
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/password/reset": {
+            "post": {
+                "summary": "Choose a new password with the link from the mail",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "Also confirms the email address. A notice is mailed afterwards.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "token",
+                                    "newPassword"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "token": {
+                                        "type": "string",
+                                        "minLength": 20,
+                                        "maxLength": 200,
+                                        "pattern": "^[A-Za-z0-9_-]+$"
+                                    },
+                                    "newPassword": {
+                                        "type": "string",
+                                        "minLength": 8,
+                                        "maxLength": 72
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Password changed. Log in with the new password."
+                    },
+                    "400": {
+                        "description": "Invalid input.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/email/confirm": {
+            "post": {
+                "summary": "Confirm a new email address with the link mailed to it",
+                "tags": [
+                    "Auth"
+                ],
+                "description": "Works without being logged in, the link proves who it is.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "token": {
+                                        "type": "string",
+                                        "minLength": 20,
+                                        "maxLength": 200,
+                                        "pattern": "^[A-Za-z0-9_-]+$"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The user with the new email address.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "description": "The user with the new email address.",
+                                    "type": "object",
+                                    "required": [
+                                        "user"
+                                    ],
+                                    "properties": {
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1155,6 +1443,7 @@
                 "tags": [
                     "Auth"
                 ],
+                "description": "403 when the email address is not confirmed yet.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1205,6 +1494,16 @@
                     },
                     "401": {
                         "description": "Not logged in, or the token is invalid or expired.",
+                        "content": {
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role of this user is not allowed to do this.",
                         "content": {
                             "application/problem+json": {
                                 "schema": {
@@ -1264,7 +1563,7 @@
                 "tags": [
                     "Auth"
                 ],
-                "description": "Send only what changes. A new email address also needs the current password, so nobody can take over an account from an unlocked computer.",
+                "description": "Send only what changes. A new email address also needs the current password, so nobody can take over an account from an unlocked computer. It is not changed right away: a link is mailed to the new address (pendingEmail until then) and a notice to the old one.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1462,7 +1761,7 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "Password changed. The current token stays valid."
+                        "description": "Password changed, a notice is mailed. The current token stays valid."
                     },
                     "400": {
                         "description": "Invalid input.",

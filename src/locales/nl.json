@@ -19,7 +19,9 @@
             "forbidden": "Je hebt geen toegang tot deze pagina",
             "accountGone": "Dit account bestaat niet meer",
             "emailTaken": "Er bestaat al een account met dit e-mailadres",
-            "invalidCredentials": "Onjuist e-mailadres of wachtwoord"
+            "invalidCredentials": "Onjuist e-mailadres of wachtwoord",
+            "emailNotVerified": "Bevestig eerst je e-mailadres met de link in de mail die we je stuurden",
+            "invalidLink": "Deze link werkt niet meer: hij is verlopen of al gebruikt. Vraag een nieuwe aan"
         },
         "account": {
             "passwordRequired": "Vul je huidige wachtwoord in om dit te wijzigen",
@@ -65,7 +67,8 @@
         "readingGoal": "reden om te lezen",
         "bookId": "titel",
         "status": "status",
-        "input": "invoer"
+        "input": "invoer",
+        "token": "link"
     },
     "advice": {
         "types": {
@@ -101,6 +104,51 @@
             "by": " van {{author}}",
             "about": " over {{themes}}",
             "sentence": "Een {{kind}}{{by}}{{about}}."
+        }
+    },
+    "mail": {
+        "greeting": "Hoi {{name}},",
+        "linkFallback": "Werkt de knop niet? Kopieer dan deze link in je browser:",
+        "verify": {
+            "subject": "Bevestig je e-mailadres voor Smart Reading Coach",
+            "line1": "Wat leuk dat je een account hebt gemaakt! Ik ben Bo, de leesuil, en ik help je straks boeken te vinden die bij jou passen.",
+            "line2": "Klik op de knop om je e-mailadres te bevestigen. Daarna kun je meteen aan de slag. De link werkt 48 uur.",
+            "button": "E-mailadres bevestigen",
+            "footer": "Heb jij geen account gemaakt? Dan kun je deze mail negeren."
+        },
+        "changeEmail": {
+            "subject": "Bevestig je nieuwe e-mailadres",
+            "line1": "Je wilt dit adres ({{newEmail}}) gebruiken voor je account bij Smart Reading Coach.",
+            "line2": "Klik op de knop om het te bevestigen. Tot die tijd blijft je oude adres gelden. De link werkt 24 uur.",
+            "button": "Nieuw e-mailadres bevestigen",
+            "footer": "Heb jij dit niet gevraagd? Negeer deze mail, dan verandert er niets."
+        },
+        "emailChanging": {
+            "subject": "Je e-mailadres wordt gewijzigd",
+            "line1": "Er is gevraagd om het e-mailadres van je account te veranderen in {{newEmail}}.",
+            "line2": "Was jij dat? Dan hoef je niets te doen. Was jij het niet? Kies dan meteen een nieuw wachtwoord, zodat niemand anders bij je account kan.",
+            "button": "Nieuw wachtwoord kiezen",
+            "footer": "Je e-mailadres verandert pas als iemand op de link klikt in de mail naar het nieuwe adres."
+        },
+        "passwordChanged": {
+            "subject": "Je wachtwoord is gewijzigd",
+            "line1": "Het wachtwoord van je account bij Smart Reading Coach is net veranderd.",
+            "line2": "Was jij dat? Dan is alles in orde. Was jij het niet? Kies dan meteen een nieuw wachtwoord.",
+            "button": "Nieuw wachtwoord kiezen",
+            "footer": "Je krijgt deze mail om je account veilig te houden."
+        },
+        "reset": {
+            "subject": "Kies een nieuw wachtwoord",
+            "line1": "Je hebt gevraagd om een nieuw wachtwoord voor Smart Reading Coach.",
+            "line2": "Klik op de knop om een nieuw wachtwoord te kiezen. De link werkt 1 uur en maar één keer.",
+            "button": "Nieuw wachtwoord kiezen",
+            "footer": "Heb jij dit niet gevraagd? Negeer deze mail, dan blijft je wachtwoord hetzelfde."
+        },
+        "deleted": {
+            "subject": "Je account is verwijderd",
+            "line1": "Je account bij Smart Reading Coach is verwijderd, samen met je leesprofiel, je leeslijst en je veren.",
+            "line2": "Jammer dat je weggaat! Je kunt altijd weer een nieuw account maken.",
+            "footer": "Heb jij dit niet gedaan? Neem dan contact op met je docent."
         }
     }
 }

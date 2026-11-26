@@ -13,7 +13,7 @@ import type { User } from '../entities/user.js';
 // Keeping this in one place makes sure internal fields such as the password hash
 // or the Mongo _id never leak into a response by accident.
 
-export function toUserDto(user: User): UserDto {
+export function toUserDto(user: User, pendingEmail: string | null = null): UserDto {
     return {
         id: user.id,
         email: user.email,
@@ -22,6 +22,7 @@ export function toUserDto(user: User): UserDto {
         infix: user.infix,
         lastName: user.lastName,
         role: user.role,
+        pendingEmail,
     };
 }
 

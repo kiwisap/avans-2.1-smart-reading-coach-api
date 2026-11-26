@@ -28,7 +28,17 @@ interface Operation {
 }
 type Document = { paths: Record<string, Record<string, Operation>> };
 
-const PUBLIC = new Set(['GET /api/health', 'POST /api/auth/register', 'POST /api/auth/login']);
+// Public: the email links work without being logged in, the link itself proves who it is.
+const PUBLIC = new Set([
+    'GET /api/health',
+    'POST /api/auth/register',
+    'POST /api/auth/login',
+    'POST /api/auth/verify-email',
+    'POST /api/auth/verify-email/resend',
+    'POST /api/auth/password/forgot',
+    'POST /api/auth/password/reset',
+    'POST /api/auth/email/confirm',
+]);
 const document = (await buildOpenApiDocument()) as unknown as Document;
 const operations = Object.entries(document.paths).flatMap(([path, methods]) =>
     Object.entries(methods).map(([method, operation]) => ({
@@ -84,7 +94,7 @@ describe('OpenAPI document', () => {
         }
     });
 
-    it('requires a bearer token on every route except login, register and health', () => {
+    it('requires a bearer token on every route except the public ones', () => {
         for (const { key, operation } of operations) {
             const secured = (operation.security?.length ?? 0) > 0;
             assert.equal(secured, !PUBLIC.has(key), `${key} security does not match its role`);
@@ -132,6 +142,7 @@ describe('DTOs follow the schemas', () => {
         infix: 'van der',
         lastName: 'Berg',
         role: 'student',
+        pendingEmail: null,
     };
 
     it('accepts a book, a suggestion, an advice and a user', () => {

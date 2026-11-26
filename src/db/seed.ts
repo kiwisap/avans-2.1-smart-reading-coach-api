@@ -24,6 +24,7 @@ async function ensureUser(input: {
         lastName: input.lastName,
         role: input.role,
         passwordHash,
+        emailVerifiedAt: new Date(), // demo accounts can log in right away
     });
 }
 

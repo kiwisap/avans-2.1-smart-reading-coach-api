@@ -17,6 +17,7 @@ export interface NewUser {
     infix?: string | null;
     lastName: string;
     role?: UserRole;
+    emailVerifiedAt?: Date | null; // set for accounts that need no confirmation email (seed)
 }
 
 export interface AccountChanges {
@@ -46,6 +47,7 @@ export function createUserRepository(db: Database) {
             infix = null,
             lastName,
             role = 'student',
+            emailVerifiedAt = null,
         }: NewUser): Promise<User> {
             const [user] = await db
                 .insert(users)
@@ -57,6 +59,7 @@ export function createUserRepository(db: Database) {
                     lastName: lastName.trim(),
                     name: fullName({ firstName, infix, lastName }),
                     role,
+                    emailVerifiedAt,
                 })
                 .returning();
             if (!user) throw new Error('Could not create user');
@@ -71,6 +74,28 @@ export function createUserRepository(db: Database) {
 
         async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
             await db.update(users).set({ passwordHash }).where(eq(users.id, id));
+        },
+
+        // The user clicked a link that reached their mailbox: the address is theirs.
+        async markEmailVerified(id: string): Promise<User> {
+            const [user] = await db
+                .update(users)
+                .set({ emailVerifiedAt: new Date() })
+                .where(eq(users.id, id))
+                .returning();
+            if (!user) throw new Error('Could not update user');
+            return user;
+        },
+
+        // A new email address, confirmed with the link sent to it.
+        async updateEmail(id: string, email: string): Promise<User> {
+            const [user] = await db
+                .update(users)
+                .set({ email, emailVerifiedAt: new Date() })
+                .where(eq(users.id, id))
+                .returning();
+            if (!user) throw new Error('Could not update user');
+            return user;
         },
 
         // The reading profile, reading list and teacher links are removed with it (ON DELETE CASCADE).

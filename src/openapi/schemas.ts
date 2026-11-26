@@ -124,7 +124,7 @@ export const sharedSchemas = [
     {
         $id: 'User',
         type: 'object',
-        required: ['id', 'email', 'name', 'firstName', 'infix', 'lastName', 'role'],
+        required: ['id', 'email', 'name', 'firstName', 'infix', 'lastName', 'role', 'pendingEmail'],
         properties: {
             id: uuid('User id.'),
             email: text('Email address.', { format: 'email' }),
@@ -133,6 +133,13 @@ export const sharedSchemas = [
             infix: nullableText('Tussenvoegsel, for example "van der". Null when there is none.'),
             lastName: text('Achternaam.'),
             role: { $ref: 'Role#' },
+            pendingEmail: {
+                type: 'string',
+                format: 'email',
+                nullable: true,
+                description:
+                    'A new email address that waits for its confirmation link to be clicked.',
+            },
         },
     },
     {
@@ -142,6 +149,15 @@ export const sharedSchemas = [
         properties: {
             token: text('JWT. Send it as Authorization: Bearer <token>.'),
             user: { $ref: 'User#' },
+        },
+    },
+    {
+        $id: 'Registered',
+        type: 'object',
+        description: 'The account exists, but can only be used after confirming the email address.',
+        required: ['email'],
+        properties: {
+            email: text('The address the confirmation link was sent to.', { format: 'email' }),
         },
     },
     {

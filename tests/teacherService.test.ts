@@ -15,6 +15,7 @@ const makeUser = (id: string, name: string, role: User['role']): User => ({
     role,
     email: `${id}@example.com`,
     passwordHash: 'hash',
+    emailVerifiedAt: new Date(),
     createdAt: new Date(),
 });
 

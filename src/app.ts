@@ -7,6 +7,7 @@ import mongo from './plugins/mongo.js';
 import auth from './plugins/auth.js';
 import errorHandler from './plugins/errorHandler.js';
 import locale from './plugins/locale.js';
+import mail from './plugins/mail.js';
 import { registerDocs } from './openapi/docs.js';
 import { registerRoutes } from './routes/index.js';
 
@@ -22,6 +23,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     await app.register(postgres, { connectionString: config.postgresUrl });
     await app.register(mongo, { url: config.mongoUrl, dbName: config.mongoDb });
     await app.register(auth, { secret: config.jwtSecret, expiresIn: config.jwtExpiresIn });
+    await app.register(mail, {
+        smtpUrl: config.smtpUrl,
+        from: config.mailFrom,
+        appUrl: config.appUrl,
+        devOutbox: config.devMailOutbox,
+    });
     await app.register(ai, {
         baseUrl: config.aiServiceUrl,
         apiKey: config.aiApiKey,

@@ -22,6 +22,7 @@ const withoutDatabases = fp(async (fastify) => {
     fastify.decorate('db', inert() as never);
     fastify.decorate('mongo', inert() as never);
     fastify.decorate('ai', null);
+    fastify.decorate('mail', { mailer: { send: async () => {} }, appUrl: 'http://localhost' });
 });
 
 // A Fastify app with all routes and plugins, but without database connections.

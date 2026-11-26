@@ -47,17 +47,21 @@ Start daarna de frontend (zie de README in `smart-reading-coach`).
 
 ### Instellingen (`.env`)
 
-| Variabele               | Betekenis                                                                     | Standaard               |
-| ----------------------- | ----------------------------------------------------------------------------- | ----------------------- |
-| `PORT`, `HOST`          | Waar de API luistert                                                          | `3000`, `0.0.0.0`       |
-| `CORS_ORIGIN`           | Adres van de frontend                                                         | `http://localhost:5173` |
-| `POSTGRES_URL`          | Verbinding met PostgreSQL                                                     | zie `.env.example`      |
-| `MONGO_URL`, `MONGO_DB` | Verbinding met MongoDB en de databasenaam                                     | zie `.env.example`      |
-| `JWT_SECRET`            | Geheim waarmee tokens worden ondertekend, kies een lange willekeurige waarde  | verplicht               |
-| `JWT_EXPIRES_IN`        | Levensduur van een token                                                      | `8h`                    |
-| `AI_SERVICE_URL`        | Adres van de AI service, leeg laten voor alleen regels                        | `http://localhost:8000` |
-| `AI_API_KEY`            | Gedeelde sleutel met de AI service (header `X-API-Key`), leeg is geen sleutel | leeg                    |
-| `AI_TIMEOUT_MS`         | Hoe lang de API op de AI service wacht voordat de regels het overnemen        | `3000`                  |
+| Variabele               | Betekenis                                                                                                                          | Standaard                                           |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `PORT`, `HOST`          | Waar de API luistert                                                                                                               | `3000`, `0.0.0.0`                                   |
+| `CORS_ORIGIN`           | Adres van de frontend                                                                                                              | `http://localhost:5173`                             |
+| `POSTGRES_URL`          | Verbinding met PostgreSQL                                                                                                          | zie `.env.example`                                  |
+| `MONGO_URL`, `MONGO_DB` | Verbinding met MongoDB en de databasenaam                                                                                          | zie `.env.example`                                  |
+| `JWT_SECRET`            | Geheim waarmee tokens worden ondertekend, kies een lange willekeurige waarde                                                       | verplicht                                           |
+| `JWT_EXPIRES_IN`        | Levensduur van een token                                                                                                           | `8h`                                                |
+| `AI_SERVICE_URL`        | Adres van de AI service, leeg laten voor alleen regels                                                                             | `http://localhost:8000`                             |
+| `AI_API_KEY`            | Gedeelde sleutel met de AI service (header `X-API-Key`), leeg is geen sleutel                                                      | leeg                                                |
+| `AI_TIMEOUT_MS`         | Hoe lang de API op de AI service wacht voordat de regels het overnemen                                                             | `3000`                                              |
+| `SMTP_URL`              | SMTP server voor de mails, bijvoorbeeld `smtps://login:key@smtp-relay.brevo.com:465`. Leeg: mails komen in de console, met de link | leeg                                                |
+| `MAIL_FROM`             | Afzender van de mails                                                                                                              | `Bo van Smart Reading Coach <no-reply@example.com>` |
+| `APP_URL`               | Adres van de website, de links in de mails wijzen daarheen                                                                         | `CORS_ORIGIN`                                       |
+| `DEV_MAIL_OUTBOX`       | Alleen voor de e2e tests: verstuurde mails staan op `GET /api/dev/mails`. Werkt nooit met `NODE_ENV=production`                    | `false`                                             |
 
 Het bestand `.env` staat in `.gitignore` en wordt nooit gecommit.
 
@@ -183,7 +187,8 @@ Elk soort data staat in de opslag die er het beste bij past.
 
 | Tabel                | Inhoud                                                                                                            |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `users`              | Accounts met rol `student` of `teacher`                                                                           |
+| `users`              | Accounts met rol `student` of `teacher`, met `email_verified_at` (null tot de bevestigingslink is aangeklikt)     |
+| `email_tokens`       | Eenmalige links uit de mails (bevestigen, nieuw e-mailadres, wachtwoord vergeten). Alleen de hash van de token    |
 | `teacher_students`   | Welke leerling aan welke docent gekoppeld is                                                                      |
 | `reading_profiles`   | Het leesprofiel, één per leerling                                                                                 |
 | `reading_list_items` | De leeslijst, uniek per combinatie van leerling en titel, met de bron (`advice`, `catalog` of `teacher`)          |
@@ -270,7 +275,19 @@ Wijzig je een route of schema, draai dan `npm run openapi` en commit `openapi.js
 ## Authenticatie en autorisatie
 
 - Inloggen levert een JWT met het gebruikers id (`sub`) en de rol.
-- Elke route behalve registreren, inloggen en de health check vraagt een geldig token via `fastify.authenticate`.
+- Elke route behalve registreren, inloggen, de links uit de mails en de health check vraagt een geldig token via `fastify.authenticate`.
+
+### E-mail
+
+Net als bij andere apps gaat het account via de mail (`services/accountMailService.ts`, teksten in `locales/nl.json` onder `mail`):
+
+- **Registreren**: een bevestigingslink (48 uur geldig). Inloggen kan pas daarna, de link logt de leerling meteen in.
+- **Nieuw e-mailadres**: een link naar het nieuwe adres (24 uur) en een waarschuwing naar het oude. Het adres verandert pas na de link.
+- **Wachtwoord vergeten**: een link van 1 uur. Na het opslaan krijgt de leerling een bericht, en andere open links werken niet meer.
+- **Wachtwoord gewijzigd** en **account verwijderd**: een bericht ter controle.
+
+Veiligheid: een token is 32 willekeurige bytes, de database bewaart alleen de sha256 hash. Een link werkt één keer (één `UPDATE ... RETURNING`, dus ook niet twee keer tegelijk), alleen de nieuwste link per doel werkt, en opnieuw aanvragen kan eens per minuut. Wachtwoord vergeten en mail opnieuw sturen antwoorden altijd hetzelfde, zodat niemand kan uitzoeken welke adressen een account hebben. Mails gaan via SMTP (`mail/mailer.ts`, nodemailer), dus elke aanbieder werkt. Zonder `SMTP_URL` staan ze in de console van de API, met de link erin. Accounts van voor deze functie zijn bij de migratie als bevestigd gemarkeerd.
+
 - Routes die alleen voor één rol zijn, gebruiken `fastify.authorize('student')` of `fastify.authorize('teacher')`.
 - Een docent koppelt zichzelf aan een leerling en ziet alleen leerlingen aan wie hij gekoppeld is. Dat wordt in `teacherService` afgedwongen en geeft anders een 403.
 
@@ -278,34 +295,38 @@ Wijzig je een route of schema, draai dan `npm run openapi` en commit `openapi.js
 
 Alle paden beginnen met `/api`.
 
-| Methode en pad                                                      | Wie      | Doel                                                                                                                                                         |
-| ------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POST /auth/register`                                               | iedereen | Account aanmaken (rol leerling)                                                                                                                              |
-| `POST /auth/login`                                                  | iedereen | Inloggen, geeft een token                                                                                                                                    |
-| `GET /auth/me`                                                      | ingelogd | Huidige gebruiker                                                                                                                                            |
-| `PATCH /auth/me`                                                    | ingelogd | Voornaam, tussenvoegsel, achternaam of e-mailadres wijzigen (een nieuw e-mailadres vraagt het huidige wachtwoord)                                            |
-| `PUT /auth/me/password`                                             | ingelogd | Wachtwoord wijzigen met het huidige wachtwoord                                                                                                               |
-| `DELETE /auth/me`                                                   | ingelogd | Account verwijderen met het huidige wachtwoord, samen met leesprofiel, leeslijst en koppelingen met docenten                                                 |
-| `GET /books`                                                        | ingelogd | Catalogus met zoeken, filters en paginering (`search`, `type`, `level`, `theme` (elk herhaalbaar, bijvoorbeeld `theme=humor&theme=oorlog`), `page`, `limit`) |
-| `GET /books/filters`                                                | ingelogd | Beschikbare waarden voor de filters                                                                                                                          |
-| `GET /books/:id`                                                    | ingelogd | Eén titel                                                                                                                                                    |
-| `GET /profile/options`                                              | leerling | Keuzes voor het leesprofiel                                                                                                                                  |
-| `GET /profile/me`, `PUT /profile/me`                                | leerling | Eigen leesprofiel lezen en opslaan                                                                                                                           |
-| `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie en redenen, plus de bron (`ai` of `rules`)                                                                            |
-| `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                                                                                     |
-| `POST /reading-list` (body `source`)                                | leerling | `source` is `advice` of `catalog` (standaard), zodat we zien of het advies helpt                                                                             |
-| `PUT /reading-list/:id/rating`                                      | leerling | Sterren en een opmerking bij een gelezen titel                                                                                                               |
-| `GET /progress/me`                                                  | leerling | XP, badges, de volgende badge en de XP per actie                                                                                                             |
-| `GET /students/advice-stats`                                        | docent   | Helpt het advies: getoonde tips, bron van de leeslijsten, gelezen, sterren, AI model tegenover regels                                                        |
-| `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                                                                                     |
-| `GET /teachers`                                                     | leerling | Docenten die aan jou gekoppeld zijn (alleen bekijken)                                                                                                        |
-| `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                                                                                        |
-| `GET /students/search?search=`                                      | docent   | Leerlingen zoeken op naam of e-mailadres (minimaal 2 tekens, maximaal 20 resultaten), met of je al gekoppeld bent                                            |
-| `PUT /students/:studentId/link`, `DELETE /students/:studentId/link` | docent   | Jezelf aan een leerling koppelen en weer ontkoppelen                                                                                                         |
-| `GET /students/:studentId`                                          | docent   | Leesprofiel en leeslijst van een gekoppelde leerling                                                                                                         |
-| `GET /students/:studentId/advice`                                   | docent   | Het leesadvies van een gekoppelde leerling (hetzelfde als wat de leerling ziet)                                                                              |
-| `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                                                                                        |
-| `GET /health`                                                       | iedereen | Status van beide databases en de AI service                                                                                                                  |
+| Methode en pad                                                      | Wie      | Doel                                                                                                                                                                  |
+| ------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/register`                                               | iedereen | Account aanmaken (rol leerling). Stuurt een bevestigingsmail, inloggen kan pas na de link                                                                             |
+| `POST /auth/verify-email`                                           | iedereen | Bevestigen met de token uit de mail, geeft meteen een token (ingelogd)                                                                                                |
+| `POST /auth/verify-email/resend`                                    | iedereen | Bevestigingsmail opnieuw, hoogstens eens per minuut                                                                                                                   |
+| `POST /auth/password/forgot`, `POST /auth/password/reset`           | iedereen | Link voor een nieuw wachtwoord (1 uur geldig) en het nieuwe wachtwoord opslaan                                                                                        |
+| `POST /auth/email/confirm`                                          | iedereen | Een nieuw e-mailadres bevestigen met de link die naar dat adres ging                                                                                                  |
+| `POST /auth/login`                                                  | iedereen | Inloggen, geeft een token. 403 als het e-mailadres nog niet bevestigd is                                                                                              |
+| `GET /auth/me`                                                      | ingelogd | Huidige gebruiker                                                                                                                                                     |
+| `PATCH /auth/me`                                                    | ingelogd | Naam wijzigen, of een nieuw e-mailadres aanvragen (met het huidige wachtwoord). Het adres verandert pas na de link in de mail, het oude adres krijgt een waarschuwing |
+| `PUT /auth/me/password`                                             | ingelogd | Wachtwoord wijzigen met het huidige wachtwoord, daarna een mail ter controle                                                                                          |
+| `DELETE /auth/me`                                                   | ingelogd | Account verwijderen met het huidige wachtwoord, samen met leesprofiel, leeslijst en koppelingen met docenten, met een afscheidsmail                                   |
+| `GET /books`                                                        | ingelogd | Catalogus met zoeken, filters en paginering (`search`, `type`, `level`, `theme` (elk herhaalbaar, bijvoorbeeld `theme=humor&theme=oorlog`), `page`, `limit`)          |
+| `GET /books/filters`                                                | ingelogd | Beschikbare waarden voor de filters                                                                                                                                   |
+| `GET /books/:id`                                                    | ingelogd | Eén titel                                                                                                                                                             |
+| `GET /profile/options`                                              | leerling | Keuzes voor het leesprofiel                                                                                                                                           |
+| `GET /profile/me`, `PUT /profile/me`                                | leerling | Eigen leesprofiel lezen en opslaan                                                                                                                                    |
+| `GET /advice`                                                       | leerling | Drie tot vijf suggesties met motivatie en redenen, plus de bron (`ai` of `rules`)                                                                                     |
+| `GET /reading-list`, `POST /reading-list`                           | leerling | Leeslijst ophalen en een titel toevoegen                                                                                                                              |
+| `POST /reading-list` (body `source`)                                | leerling | `source` is `advice` of `catalog` (standaard), zodat we zien of het advies helpt                                                                                      |
+| `PUT /reading-list/:id/rating`                                      | leerling | Sterren en een opmerking bij een gelezen titel                                                                                                                        |
+| `GET /progress/me`                                                  | leerling | XP, badges, de volgende badge en de XP per actie                                                                                                                      |
+| `GET /students/advice-stats`                                        | docent   | Helpt het advies: getoonde tips, bron van de leeslijsten, gelezen, sterren, AI model tegenover regels                                                                 |
+| `PATCH /reading-list/:id`, `DELETE /reading-list/:id`               | leerling | Status wijzigen (gelezen of niet gelezen) en verwijderen                                                                                                              |
+| `GET /teachers`                                                     | leerling | Docenten die aan jou gekoppeld zijn (alleen bekijken)                                                                                                                 |
+| `GET /students`                                                     | docent   | Gekoppelde leerlingen                                                                                                                                                 |
+| `GET /students/search?search=`                                      | docent   | Leerlingen zoeken op naam of e-mailadres (minimaal 2 tekens, maximaal 20 resultaten), met of je al gekoppeld bent                                                     |
+| `PUT /students/:studentId/link`, `DELETE /students/:studentId/link` | docent   | Jezelf aan een leerling koppelen en weer ontkoppelen                                                                                                                  |
+| `GET /students/:studentId`                                          | docent   | Leesprofiel en leeslijst van een gekoppelde leerling                                                                                                                  |
+| `GET /students/:studentId/advice`                                   | docent   | Het leesadvies van een gekoppelde leerling (hetzelfde als wat de leerling ziet)                                                                                       |
+| `POST /students/:studentId/reading-list`                            | docent   | Een titel toevoegen aan de leeslijst van een leerling                                                                                                                 |
+| `GET /health`                                                       | iedereen | Status van beide databases en de AI service                                                                                                                           |
 
 ### Foutantwoorden
 

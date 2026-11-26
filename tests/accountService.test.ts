@@ -18,6 +18,7 @@ const makeUser = (id: string, email: string, firstName: string, lastName: string
     lastName,
     role: 'student',
     passwordHash: hash,
+    emailVerifiedAt: new Date(),
     createdAt: new Date(),
 });
 
@@ -46,7 +47,26 @@ function setup() {
             return true;
         },
     };
-    return { service: createAccountService({ userRepository }), users };
+    const mails: string[] = [];
+    let pending: string | null = null;
+    const accountMailService = {
+        requestEmailChange: async (user: User, newEmail: string) => {
+            pending = newEmail;
+            mails.push(`change:${user.email}->${newEmail}`);
+        },
+        pendingEmail: async () => pending,
+        notifyPasswordChanged: async (user: User) => {
+            mails.push(`password:${user.email}`);
+        },
+        notifyAccountDeleted: async (user: User) => {
+            mails.push(`deleted:${user.email}`);
+        },
+    };
+    return {
+        service: createAccountService({ userRepository, accountMailService }),
+        users,
+        mails,
+    };
 }
 
 const statusOf = (err: unknown) => (err as { statusCode?: number }).statusCode;
@@ -66,11 +86,15 @@ describe('fullName', () => {
 describe('accountService', () => {
     it('changes the name parts without asking for the password and rebuilds the full name', async () => {
         const { service } = setup();
-        const user = await service.updateAccount('u1', {
-            firstName: ' Sanne ',
-            infix: 'van der',
-            lastName: 'Berg',
-        });
+        const user = await service.updateAccount(
+            'u1',
+            {
+                firstName: ' Sanne ',
+                infix: 'van der',
+                lastName: 'Berg',
+            },
+            'nl',
+        );
         assert.equal(user.firstName, 'Sanne');
         assert.equal(user.infix, 'van der');
         assert.equal(user.name, 'Sanne van der Berg');
@@ -78,29 +102,36 @@ describe('accountService', () => {
 
     it('removes the infix when it is sent empty', async () => {
         const { service } = setup();
-        await service.updateAccount('u1', { infix: 'de' });
-        const user = await service.updateAccount('u1', { infix: '' });
+        await service.updateAccount('u1', { infix: 'de' }, 'nl');
+        const user = await service.updateAccount('u1', { infix: '' }, 'nl');
         assert.equal(user.infix, null);
         assert.equal(user.name, 'Sam Berg');
     });
 
-    it('changes the email address with the current password, in lowercase', async () => {
-        const { service } = setup();
-        const user = await service.updateAccount('u1', {
-            email: 'Sam.New@Example.com',
-            currentPassword: PASSWORD,
-        });
-        assert.equal(user.email, 'sam.new@example.com');
+    it('mails a link to a new email address and keeps the old one until it is clicked', async () => {
+        const { service, mails } = setup();
+        const user = await service.updateAccount(
+            'u1',
+            { email: 'Sam.New@Example.com', currentPassword: PASSWORD },
+            'nl',
+        );
+        assert.equal(user.email, 'sam@example.com');
+        assert.equal(user.pendingEmail, 'sam.new@example.com');
+        assert.deepEqual(mails, ['change:sam@example.com->sam.new@example.com']);
     });
 
     it('refuses a new email address without or with a wrong password', async () => {
         const { service, users } = setup();
         await assert.rejects(
-            service.updateAccount('u1', { email: 'new@example.com' }),
+            service.updateAccount('u1', { email: 'new@example.com' }, 'nl'),
             (err: unknown) => statusOf(err) === 400 && codeOf(err) === 'account.passwordRequired',
         );
         await assert.rejects(
-            service.updateAccount('u1', { email: 'new@example.com', currentPassword: 'wrong' }),
+            service.updateAccount(
+                'u1',
+                { email: 'new@example.com', currentPassword: 'wrong' },
+                'nl',
+            ),
             (err: unknown) => codeOf(err) === 'account.wrongPassword',
         );
         assert.equal(users[0]?.email, 'sam@example.com');
@@ -109,59 +140,81 @@ describe('accountService', () => {
     it('refuses an email address that belongs to someone else', async () => {
         const { service } = setup();
         await assert.rejects(
-            service.updateAccount('u1', { email: 'taken@example.com', currentPassword: PASSWORD }),
+            service.updateAccount(
+                'u1',
+                { email: 'taken@example.com', currentPassword: PASSWORD },
+                'nl',
+            ),
             (err: unknown) => statusOf(err) === 409,
         );
     });
 
     it('does not ask for the password when the email address stays the same', async () => {
         const { service } = setup();
-        const user = await service.updateAccount('u1', {
-            email: 'SAM@example.com',
-            firstName: 'Sam',
-        });
+        const user = await service.updateAccount(
+            'u1',
+            {
+                email: 'SAM@example.com',
+                firstName: 'Sam',
+            },
+            'nl',
+        );
         assert.equal(user.email, 'sam@example.com');
     });
 
-    it('changes the password only with the right current password', async () => {
-        const { service, users } = setup();
+    it('changes the password only with the right current password, and mails a notice', async () => {
+        const { service, users, mails } = setup();
         await assert.rejects(
-            service.changePassword('u1', { currentPassword: 'wrong', newPassword: 'Nieuw123!' }),
+            service.changePassword(
+                'u1',
+                { currentPassword: 'wrong', newPassword: 'Nieuw123!' },
+                'nl',
+            ),
             (err: unknown) => codeOf(err) === 'account.wrongPassword',
         );
-        await service.changePassword('u1', {
-            currentPassword: PASSWORD,
-            newPassword: 'Nieuw123!',
-        });
+        await service.changePassword(
+            'u1',
+            {
+                currentPassword: PASSWORD,
+                newPassword: 'Nieuw123!',
+            },
+            'nl',
+        );
         assert.ok(await bcrypt.compare('Nieuw123!', users[0]?.passwordHash ?? ''));
+        assert.deepEqual(mails, ['password:sam@example.com']);
     });
 
     it('refuses a new password that is the same as the current one', async () => {
         const { service } = setup();
         await assert.rejects(
-            service.changePassword('u1', { currentPassword: PASSWORD, newPassword: PASSWORD }),
+            service.changePassword(
+                'u1',
+                { currentPassword: PASSWORD, newPassword: PASSWORD },
+                'nl',
+            ),
             (err: unknown) => codeOf(err) === 'account.samePassword',
         );
     });
 
-    it('deletes the account only with the right password', async () => {
-        const { service, users } = setup();
+    it('deletes the account only with the right password, and says goodbye by mail', async () => {
+        const { service, users, mails } = setup();
         await assert.rejects(
-            service.deleteAccount('u1', 'wrong'),
+            service.deleteAccount('u1', 'wrong', 'nl'),
             (err: unknown) => codeOf(err) === 'account.wrongPassword',
         );
         assert.equal(users.length, 2);
-        await service.deleteAccount('u1', PASSWORD);
+        await service.deleteAccount('u1', PASSWORD, 'nl');
         assert.deepEqual(
             users.map((user) => user.id),
             ['u2'],
         );
+        assert.deepEqual(mails, ['deleted:sam@example.com']);
     });
 
     it('treats a removed account as logged out', async () => {
         const { service } = setup();
         await assert.rejects(
-            service.updateAccount('gone', { firstName: 'X' }),
+            service.updateAccount('gone', { firstName: 'X' }, 'nl'),
             (err: unknown) => statusOf(err) === 401,
         );
     });

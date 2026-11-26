@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import type { LoginDto } from '../dto/loginDto.js';
 import type { RegisterDto } from '../dto/registerDto.js';
 import type { UserDto } from '../dto/userDto.js';
+import type { User } from '../entities/user.js';
 import { HttpError } from '../errors.js';
 import { toUserDto } from './mappingService.js';
 import type { UserRepository } from '../repositories/userRepository.js';
@@ -17,13 +18,14 @@ function isUniqueViolation(err: unknown): boolean {
 export function createAuthService({ userRepository }: { userRepository: UserRepository }) {
     return {
         // Self registration always creates a student. Teachers are created by an admin or the seed script.
+        // The account can be used after clicking the link in the confirmation mail.
         async register({
             email,
             password,
             firstName,
             infix,
             lastName,
-        }: RegisterDto): Promise<UserDto> {
+        }: RegisterDto): Promise<User> {
             const normalizedEmail = email.trim().toLowerCase();
 
             if (await userRepository.findByEmail(normalizedEmail)) {
@@ -40,7 +42,7 @@ export function createAuthService({ userRepository }: { userRepository: UserRepo
                     lastName,
                     role: 'student',
                 });
-                return toUserDto(user);
+                return user;
             } catch (err) {
                 if (isUniqueViolation(err)) {
                     throw new HttpError(409, 'auth.emailTaken');
@@ -57,6 +59,8 @@ export function createAuthService({ userRepository }: { userRepository: UserRepo
             if (!user || !valid) {
                 throw new HttpError(401, 'auth.invalidCredentials');
             }
+            // Only after the right password, so this does not tell strangers an account exists.
+            if (!user.emailVerifiedAt) throw new HttpError(403, 'auth.emailNotVerified');
             return toUserDto(user);
         },
     };

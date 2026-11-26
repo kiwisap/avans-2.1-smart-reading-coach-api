@@ -4,6 +4,7 @@ import type { AiClient } from '../advice/aiClient.js';
 import type { UserRole } from '../auth/roles.js';
 import type { Database } from '../db/types.js';
 import type { Locale } from '../i18n.js';
+import type { Mailer } from '../mail/mailer.js';
 
 // Teach TypeScript about the things our plugins add to Fastify.
 declare module 'fastify' {
@@ -12,6 +13,7 @@ declare module 'fastify' {
         db: Database;
         mongo: { client: MongoClient; db: Db; files: GridFSBucket };
         ai: AiClient | null;
+        mail: { mailer: Mailer; appUrl: string };
         authenticate: (request: FastifyRequest) => Promise<void>;
         authorize: (...roles: UserRole[]) => (request: FastifyRequest) => Promise<void>;
     }

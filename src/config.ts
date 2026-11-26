@@ -19,4 +19,11 @@ export const config = {
     aiServiceUrl: process.env.AI_SERVICE_URL || null,
     aiApiKey: process.env.AI_API_KEY || null,
     aiTimeoutMs: Number(process.env.AI_TIMEOUT_MS ?? 3000),
+    // Mail over SMTP (any provider). Without SMTP_URL mails are written to the log, with the link.
+    smtpUrl: process.env.SMTP_URL || null,
+    mailFrom: process.env.MAIL_FROM ?? 'Bo van Smart Reading Coach <no-reply@example.com>',
+    // The website: the links in the mails point here.
+    appUrl: process.env.APP_URL ?? process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    // Development only: keeps sent mails readable on /api/dev/mails for the e2e tests.
+    devMailOutbox: process.env.DEV_MAIL_OUTBOX === 'true' && process.env.NODE_ENV !== 'production',
 };

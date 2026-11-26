@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { ADVICE_SOURCES } from '../advice/sources.js';
+import { TOKEN_PURPOSES } from '../auth/emailTokens.js';
 import { USER_ROLES } from '../auth/roles.js';
 import {
     DESIRED_LENGTHS,
@@ -30,6 +31,7 @@ export const readingStatus = pgEnum('reading_status', READING_STATUSES);
 export const readingListSource = pgEnum('reading_list_source', READING_LIST_SOURCES);
 export const adviceSource = pgEnum('advice_source', ADVICE_SOURCES);
 export const xpReason = pgEnum('xp_reason', XP_REASONS);
+export const tokenPurpose = pgEnum('token_purpose', TOKEN_PURPOSES);
 
 export const users = pgTable('users', {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -40,6 +42,23 @@ export const users = pgTable('users', {
     infix: text('infix'), // tussenvoegsel, for example "van der"
     lastName: text('last_name').notNull().default(''),
     role: userRole('role').notNull().default('student'),
+    // Null until the user clicked the link in the confirmation email. Logging in needs it.
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One-time links sent by email. Only the hash of the token is stored.
+// newEmail is the address a change_email link confirms.
+export const emailTokens = pgTable('email_tokens', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+        .notNull()
+        .references(() => users.id, { onDelete: 'cascade' }),
+    purpose: tokenPurpose('purpose').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    newEmail: text('new_email'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
